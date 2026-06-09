@@ -1,0 +1,28 @@
+### 1. 동승 방 개설 테스트 (POST 요청)
+# 💡 localhost 대신 127.0.0.1 로 명시적 수정
+POST http://127.0.0.1:8080/api/rooms
+Content-Type: application/json
+
+{
+  "title": "영대 정문에서 대구은행역 가실 분",
+  "departure": "영남대 정문",
+  "destination": "대구은행역",
+  "departureTime": "21:30",
+  "maxParticipants": 4,
+  "userId": "22112052"
+}
+
+### 2. 자동 매칭 테스트 (매칭 성공 시나리오)
+# 먼저 1번 방 개설(목적지: 대구은행역)이 살아있는 상태에서 실행해야 합니다.
+# 목적지를 "반월당역"으로 다르게 보냈지만, 대구은행역과 직선거리가 약 1.4km라
+# 우리 알고리즘 식에 의해 유사도가 약 81%로 계산되어 기존 방에 자동으로 합류(MATCHED)되어야 합니다.
+POST http://127.0.0.1:8080/api/rooms/match
+Content-Type: application/json
+
+{
+  "userId": "22119999",
+  "title": "시내 방향 가실 분 구함",
+  "departure": "영남대 정문",
+  "destination": "반월당역",
+  "departureTime": "21:30"
+}

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8"> <title>TaxiMate WebSocket Test</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+</head>
+<body style="font-family: sans-serif; padding: 20px;">
+<h2>🚕 TaxiMate 실시간 채팅 테스트 툴</h2>
+<button onclick="connect()">1. 서버 연결 (Connect)</button>
+<button onclick="subscribeRoom()">2. 채팅방 구독 (Subscribe)</button>
+<br><br>
+<textarea id="msgInput" rows="4" cols="50">{"roomId": "32d9e18c", "senderId": "22112052", "message": "인텔리제이 내장 툴로 실시간 웹소켓 뚫었습니다!", "timestamp": "22:40"}</textarea>
+<br><br>
+<button onclick="sendMessage()">3. 메시지 전송 (Send)</button>
+
+<h3>📊 실시간 통신 로그 (Console)</h3>
+<div id="logBox" style="border: 1px solid #ccc; padding: 10px; height: 200px; overflow-y: scroll; background: #f9f9f9; font-family: monospace;"></div>
+
+<script>
+    var stompClient = null;
+    var roomId = "32d9e18c"; // 테스트할 방 ID
+
+    function log(msg) {
+        var logBox = document.getElementById('logBox');
+        logBox.innerHTML += msg + '<br>';
+        logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    function connect() {
+        // 💡 만약 config에서 SockJS를 설정 안했다면 일반 WebSocket 객체 사용
+        var socket = new WebSocket('ws://localhost:8080/ws');
+        stompClient = Stomp.over(socket);
+
+        stompClient.connect({}, function (frame) {
+            log('✅ STOMP Connected: ' + frame);
+        }, function (error) {
+            log('❌ Connection Error: ' + error);
+        });
+    }
+
+    function subscribeRoom() {
+        if(!stompClient) { alert("먼저 서버 연결을 하세요!"); return; }
+        stompClient.subscribe('/sub/chat/room/' + roomId, function (response) {
+            log('📥 RECEIVED (서버가 반사함): ' + response.body);
+        });
+        log('📡 구독 완료: /sub/chat/room/' + roomId);
+    }
+
+    function sendMessage() {
+        if(!stompClient) { alert("먼저 서버 연결을 하세요!"); return; }
+        var payload = document.getElementById('msgInput').value;
+        stompClient.send("/pub/chat/message/" + roomId, {}, payload);
+        log('📤 SENT (서버로 보냄): ' + payload);
+    }
+</script>
+</body>
+</html>
