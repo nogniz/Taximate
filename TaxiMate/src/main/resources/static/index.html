@@ -241,9 +241,21 @@ body{font-family:'Segoe UI',Apple SD Gothic Neo,sans-serif;background:#f4f6fb;co
     <div id="auth-register" class="auth-panel">
       <div class="field"><label>학번</label><input id="r-id" placeholder="22112052"></div>
       <div class="field"><label>이름</label><input id="r-name" placeholder="홍길동"></div>
-      <div class="field"><label>이메일</label><input id="r-email" type="email" placeholder="xxx@yu.ac.kr"></div>
+      <div class="field"><label>이메일</label>
+        <div style="display:flex;gap:8px">
+          <input id="r-email" type="email" placeholder="xxx@yu.ac.kr" style="flex:1">
+          <button class="btn btn-outline" style="white-space:nowrap;padding:0 12px" onclick="sendEmail()">인증코드 발송</button>
+        </div>
+      </div>
+      <div class="field" id="code-field" style="display:none">
+        <label>인증코드</label>
+        <div style="display:flex;gap:8px">
+          <input id="r-code" placeholder="6자리 코드 입력" style="flex:1">
+          <button class="btn btn-outline" style="white-space:nowrap;padding:0 12px" onclick="verifyCode()">확인</button>
+        </div>
+      </div>
       <div class="field"><label>비밀번호</label><input id="r-pw" type="password" placeholder="비밀번호"></div>
-      <button class="btn btn-dark" id="reg-btn" onclick="doRegister()">회원가입</button>
+      <button class="btn btn-dark" id="reg-btn" onclick="doRegister()" disabled style="opacity:0.5">이메일 인증 후 가입 가능</button>
     </div>
   </div>
 </div>
