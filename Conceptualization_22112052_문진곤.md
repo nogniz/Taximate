@@ -10,6 +10,7 @@
 | Revision date | Version # | Description | Author |
 | :--- | :--- | :--- | :--- |
 | 03/27/2026 | 0.1 | 초기 컨셉 잡기 | 문진곤 |
+| 06/11/2026 | 1.0 | 실제 구현 기반으로 전면 업데이트 (이메일 인증, JWT, 자동 매칭, WebSocket, 정산) | 문진곤 |
 
 ---
 
@@ -19,10 +20,10 @@
 *  실시간으로 목적지가 맞는 사람을 찾기 어렵고 신원 확인이 불확실하다는 단점이 있습니다.  
 *  특히 대학교 주변처럼 특정 시간대에 수요가 몰리는 지역에서는 동승자를 찾는 과정 자체가 스트레스가 되기도 합니다.  
 *  본 프로젝트는 사용자가 일일이 동승자를 찾아 헤매는 수고를 덜어주는 것을 목표로 합니다.  
-*  사용자가 목적지와 시간대만 입력하면, 시스템이 위치 정보를 기반으로 최적의 동승 후보를 필터링하여 매칭해 줍니다.  
+*  사용자가 목적지와 시간대만 입력하면, 시스템이 Haversine 공식으로 목적지 간 직선거리를 계산하여 최적의 동승 방에 자동으로 합류시킵니다.  
 *  이를 통해 복잡한 검색 과정 없이도 단 몇 번의 클릭만으로 안전하고 저렴하게 택시를 이용할 수 있는 편의성을 제공하고자 합니다.  
-*  앱 사용 시 위치 정보 활용을 통해 출발지 설정을 자동화하고, 사용자의 이동 경로를 분석하여 경로 상에 있는 다른 사용자들을 추천합니다.  
-*  또한, 학교 메일 인증 시스템을 도입하여 '누가 탈지 모른다'는 불안감을 해소하고 신뢰할 수 있는 대학생 전용 동승 환경을 구축합니다.  
+*  학교 이메일 인증 시스템을 도입하여 '누가 탈지 모른다'는 불안감을 해소하고 신뢰할 수 있는 대학생 전용 동승 환경을 구축합니다.  
+*  탑승 완료 후에는 총 택시비를 인원수로 나누어 1인당 금액을 자동 계산하는 N빵 정산 기능을 제공합니다.
 
 ---
 
@@ -30,19 +31,14 @@
 
 ![System Context Diagram](./diagram.png)
 
-* **Login**: 로그인
-* **Register**: 회원가입
-* **View My Profile**: 내 정보 조회
-* **Logout**: 로그아웃
-* **Request Ride**: 동승 요청 (목적지, 시간 설정)
-* **Join Room**: 생성된 동승 방 참여
-* **Send/Receive Message**: 동승자 간 실시간 채팅 송신 및 수신
-* **Cancel Ride**: 동승 요청 방 참여 취소
-* **Update Room Status**: 동승 방 상태 정보 업데이트
-* **Receive Match**: 실시간 동승자 매칭 결과 수신
-* **Request/Confirm Auth**: 메일 인증 요청 및 결과 확인
-* **Verify/Return Location**: 위치 및 경로 검증 요청 및 정보 반환
-* **Process Payment / Status**: 결제 성공/실패 상태 반환
+* **Login / Register**: JWT 기반 로그인 및 학교 이메일 인증을 통한 회원가입
+* **Request Ride**: 동승 요청 (방 개설: 제목, 출발지, 목적지, 출발 시간, 최대 인원)
+* **Auto Match**: Haversine 공식 기반 목적지 유사도 자동 매칭 및 방 합류
+* **Receive Notification**: WebSocket(STOMP)으로 MATCHED / FULL / COMPLETED / CANCELLED / PAYMENT 실시간 알림 수신
+* **Update Room Status**: 방 상태 전환 (WAITING → FULL → COMPLETED / CANCELLED)
+* **Send/Receive Message**: 동승자 간 실시간 WebSocket 채팅
+* **Process Payment**: N빵 정산 (총 금액 입력 → 1인당 금액 계산 → 납부 처리)
+* **Request/Confirm Auth**: Google SMTP를 통한 학교 이메일 6자리 인증코드 발송 및 검증
 
 ---
 
@@ -50,100 +46,95 @@
 
 | No | Use Case | Actor | Description |
 | :--- | :--- | :--- | :--- |
-| 1 | Login/Logout | User | 등록된 계정으로 시스템에 접속하거나 접속을 종료함 |
-| 2 | Register | User | 메일 인증을 통해 새로운 계정을 생성함 |
-| 3 | View My Profile | User | 본인의 사용자 정보, 이용기록, 신뢰도 점수 등 조회 |
-| 4 | Request Ride | User | 목적지와 출발 시간을 설정하여 새로운 동승자 방을 생성함 |
-| 5 | Join Room | User | 이미 생성된 동승 방 목록을 확인하고 참여를 요청함 |
-| 6 | Cancel Ride | User | 생성한 방을 삭제하거나 참여 중인 동승 방에서 나감 |
-| 7 | Send/Receive Message | User | 매칭된 동승자들과 실시간으로 채팅을 주고받음 |
-| 8 | Receive Match | User | 시스템 알고리즘에 의해 최적의 동승자가 매칭되었음을 알림받음 |
-| 9 | Update Room Status | User | 동승 인원 충족, 운행 시작/종료 등 상태 실시간 업데이트 |
-| 10 | Verify / Return Location | 지도 API | 현재 위치 및 경로 유사도를 검증하여 거리 정보를 반환함 |
-| 11 | Request / Confirm Auth | 인증 서버 | 메일을 통해 인증하고 성공/실패 여부를 확인함 |
-| 12 | Process Payment (PG) | 결제 시스템 | 확정된 거리에 따른 금액 정산 및 송금/결제 절차 진행 |
+| 1 | Login / Logout | User | 등록된 이메일+비밀번호로 JWT 토큰을 발급받아 시스템에 접속함 |
+| 2 | Register | User | 학교 이메일 인증(6자리 코드, 3분 만료)을 완료한 후 학번/이름/비밀번호로 계정을 생성함 |
+| 3 | View My Profile | User | JWT 인증 후 본인의 학번, 이름, 이메일, 매너 온도를 조회함 |
+| 4 | Update Manner Temperature | User | 동승 완료 후 매너 온도 점수를 갱신함 |
+| 5 | Create Room | User | 제목, 출발지, 목적지, 출발 시간, 최대 인원을 설정하여 WAITING 상태의 동승 방을 생성함 |
+| 6 | Auto Match | User | 목적지를 입력하면 시스템이 Haversine 거리 계산으로 2km 이내 기존 방에 자동 합류 처리함 |
+| 7 | Complete Room | User (Host) | 방장이 탑승 완료 처리 시 방 상태가 WAITING/FULL → COMPLETED로 전환됨 |
+| 8 | Cancel Room | User (Host) | 방장이 방 취소 시 WAITING/FULL → CANCELLED로 전환됨 |
+| 9 | Send/Receive Message | User | 매칭된 동승자들과 WebSocket 기반 실시간 채팅을 주고받음 |
+| 10 | Receive Notification | User | WebSocket(STOMP) 구독을 통해 MATCHED / FULL / COMPLETED / PAYMENT 등의 이벤트를 실시간으로 수신함 |
+| 11 | Process Payment | User | COMPLETED 상태 방에서 총 택시비를 입력하면 1인당 금액이 자동 계산되고 개인별 납부 처리를 진행함 |
+| 12 | Request / Confirm Auth | Email Server | Google SMTP 서버로 인증코드를 발송하고 3분 내 일치 여부를 검증함 |
 
 ---
 
 ## 4. Concept of operation
 
-### 1) Login / Logout
-*  **Purpose**: 앱을 사용하기 위해 등록된 사용자인지 확인하고 접속 종료를 관리함.  
-*  **Approach**: ID/PW 입력 후 서버에서 회원 정보를 조회하여 성공/실패 여부 확인.  
-*  **Dynamics**: 앱 실행 시 로그인하거나 로그아웃을 원하는 경우 발생.  
-*  **Goals**: 로그인 및 로그아웃 기능을 구현함.  
+### 1) Login / Register
+*  **Purpose**: 학교 이메일 인증을 통해 대학생 신분을 검증하고 JWT 기반 인증 토큰을 발급함.  
+*  **Approach**: `POST /api/auth/email`로 인증코드 발송 → `POST /api/auth/verify`로 검증 → `POST /api/users/register`로 등록 → `POST /api/users/login`으로 JWT 발급.  
+*  **Dynamics**: 인증코드는 3분 만료이며, 로그인 성공 시 24시간 유효한 JWT가 발급됨.  
+*  **Goals**: 허위 계정 방지 및 서비스 안전성 극대화.
 
-### 2) Register
-*  **Purpose**: 서비스 이용을 위한 새로운 사용자 계정 생성.  
-*  **Approach**: 메일 인증을 필수 단계로 포함하여 신분 검증.  
-*  **Dynamics**: 중복 가입 방지 및 약관 동의 후 데이터베이스에 저장.  
-*  **Goals**: 회원가입 기능을 구현함.  
+### 2) View My Profile & Manner Temperature
+*  **Purpose**: 본인의 프로필과 신뢰도 지표(매너 온도)를 확인하고 관리함.  
+*  **Approach**: `GET /api/users/me`로 JWT 인증 후 프로필 조회. `PATCH /api/users/manner`로 점수 갱신.  
+*  **Dynamics**: 매너 온도는 동승 완료 후 상대방 평가 점수로 갱신됨.  
+*  **Goals**: 신뢰할 수 있는 동승 환경 유지.
 
-### 3) View My Profile
-*  **Purpose**: 개인 정보와 서비스 이용 내역 확인 및 관리.  
-*  **Approach**: 마이페이지를 통해 프로필, 학과, 매너 온도(신뢰도) 등 표시.  
-*  **Dynamics**: 과거 동승 횟수나 절약한 택시비 합계 통계 제공.  
-*  **Goals**: 내 정보를 확인할 수 있도록 함.  
+### 3) Create Room / Auto Match
+*  **Purpose**: 새로운 동승 그룹 생성 혹은 경로가 유사한 기존 방에 자동 합류.  
+*  **Approach**: `POST /api/rooms`로 방 생성 (WAITING 상태). `POST /api/rooms/match`로 Haversine 공식 기반 자동 매칭.  
+*  **Dynamics**: 목적지 간 직선거리 2km 이내이면 기존 방에 자동 합류되며, MATCHED 알림이 WebSocket으로 발송됨. 최대 인원 충족 시 FULL 알림 발송.  
+*  **Goals**: 수동 검색 없이 자동으로 최적의 동승 파트너 매칭.
 
-### 4) Request Ride / Join Room
-*  **Purpose**: 새로운 동승 그룹 생성 혹은 경로가 일치하는 방 합류.  
-*  **Approach**: 앱 내 지도에서 목적지 설정 및 방 생성 알림 송출.  
-*  **Dynamics**: 실시간 위치 정보(Map API)를 활용하여 주변 사용자에게 알림.  
-*  **Goals**: 유사 목적지 사용자를 5분 이내에 매칭하고 성공률 제고.  
+### 4) Room Status Transitions
+*  **Purpose**: 동승 방의 수명 주기(개설 → 운행 완료 또는 취소)를 명확하게 관리함.  
+*  **Approach**: 방장 전용 엔드포인트(`/complete`, `/cancel`)로 상태 전환. 불법적 전이는 400 오류 반환.  
+*  **Dynamics**: WAITING ↔ FULL 자동 전환, COMPLETED/CANCELLED는 Terminal 상태로 되돌릴 수 없음.  
+*  **Goals**: 예약 현황 정확성 유지 및 정산 진입 조건 보장.
 
-### 5) Send / Receive Message
-*  **Purpose**: 매칭된 인원 간 구체적인 탑승 위치와 시간 조율.  
-*  **Approach**: 소켓 통신을 이용한 실시간 채팅 기능 활용.  
-*  **Dynamics**: 세부 약속 지점 선정 시 사용 (예: 영남대 정문 앞).  
-*  **Goals**: 지연 시간 0.5초 미만의 원활한 소통 지원.  
+### 5) Send / Receive Message & Notifications
+*  **Purpose**: 매칭된 인원 간 실시간 소통 및 시스템 이벤트의 즉각적 전달.  
+*  **Approach**: STOMP over SockJS WebSocket으로 채팅(`/sub/chat/room/{roomId}`)과 알림(`/sub/notification/{roomId}`) 별도 채널 운용.  
+*  **Dynamics**: 알림 타입: MATCHED, FULL, COMPLETED, CANCELLED, PAYMENT, PAYMENT_DONE.  
+*  **Goals**: 지연 없는 실시간 소통 및 이벤트 전달.
 
-### 6) Cancel Ride / Update Room Status
-*  **Purpose**: 방 삭제/퇴장 관리 및 진행 상태의 실시간 공유.  
-*  **Approach**: 상태 값(인원 충족, 운행 시작/종료 등) 자동 업데이트.  
-*  **Dynamics**: 취소 시 페널티 연동 및 상태 변경에 따른 푸시 알림 발송.  
-*  **Goals**: 예약 현황 정확성 유지 및 동승 프로세스 가시성 확보.  
+### 6) Process Payment (N빵)
+*  **Purpose**: 탑승 완료 후 총 택시비를 인원수로 균등 분배하여 투명한 정산을 제공함.  
+*  **Approach**: `POST /api/payments/{roomId}`로 총 금액 입력 → `Math.ceil(totalFare/headCount)`로 1인당 금액 계산 → `PATCH /api/payments/{roomId}/pay`로 개인별 납부 처리 → 전원 납부 완료 시 PAYMENT_DONE 알림 발송.  
+*  **Dynamics**: COMPLETED 상태 방에서만 정산 가능. 이중 납부 방지 검증 포함.  
+*  **Goals**: 정확하고 투명한 N빵 정산 및 완료 알림.
 
-### 7) Receive Match
-*  **Purpose**: 최적의 동승 파트너 매칭을 사용자에게 통보.  
-*  **Approach**: 경로 유사도가 높은 방 발견 시 자동 팝업 안내.  
-*  **Dynamics**: 앱 비활성화 상태에서도 푸시 알림으로 매칭 여부 확인 가능.  
-*  **Goals**: 수동 검색의 번거로움과 대기 시간 최소화.  
-
-### 8) Verify / Return Location (Map API)
-*  **Purpose**: 위치 기반 서비스 제공 및 목적지 간 거리 측정.  
-*  **Approach**: Google Maps API 연동을 통한 실시간 좌표 수집 및 시각화.  
-*  **Dynamics**: 경로 유사도 80% 이상인 경우에만 동승 목록으로 분류.  
-*  **Goals**: 위치 오차 범위 5m 이내의 정확한 픽업 지점 설정.  
-
-### 9) Request / Confirm Auth
-*  **Purpose**: 외부 시스템을 통한 실제 대학생 여부 최종 확정.  
-*  **Approach**: 학교 인증 메일로 발송된 일회용 코드로 외부 서버와 통신.  
-*  **Dynamics**: 인증 성공 시에만 모든 서비스 기능 권한 부여.  
-*  **Goals**: 허위 계정 방지 및 서비스 안전성 극대화.  
+### 7) Request / Confirm Auth (Email Server)
+*  **Purpose**: 외부 이메일 서버를 통한 실제 대학생 여부 최종 확정.  
+*  **Approach**: Google SMTP(`smtp.gmail.com:587`, TLS)로 6자리 코드 발송. 3분 내 입력 시 인증 완료.  
+*  **Dynamics**: 인증 성공 시에만 회원가입 진행 가능. 코드 만료 시 재발송 필요.  
+*  **Goals**: 허위 계정 방지 및 서비스 안전성 극대화.
 
 ---
 
 ## 5. Problem statement
 
-*  **실시간 데이터 처리의 어려움**: 여러 사용자의 위치 정보를 실시간 수집하고 경로 유사도를 계산하기 위한 서버 부하 관리 및 알고리즘 최적화 필요.  
-*  **신뢰성 및 보안 문제**: 대학생 전용 서비스로서 철저한 학교 메일 인증 및 개인정보 노출 최소화 요구.  
-*  **결제 및 정산의 투명성**: 외부 PG사 연동 시 결제 오류 방지 및 정확한 정산 금액 분배 설계 필요.  
+*  **실시간 데이터 처리**: 여러 사용자의 동승 요청을 실시간으로 처리하기 위해 WebSocket(STOMP) 기반 비동기 알림 시스템을 도입하였다.
+*  **신뢰성 및 보안 문제**: 학교 이메일 인증과 JWT Stateless 인증으로 허위 계정과 인증 우회를 방지하였다. BCrypt로 비밀번호를 단방향 해시 저장하여 개인정보 노출을 최소화하였다.
+*  **매칭 정확도**: Google Maps API 대신 Haversine 공식을 직접 구현하여 외부 API 의존도 없이 좌표 기반 거리 계산을 수행하였다.
+*  **결제 및 정산의 투명성**: 외부 PG사 연동 없이 시스템 내부에서 1인당 금액 계산 및 납부 상태를 추적하여 정산의 정확성을 보장하였다.
 * **비기능적 요구사항 (NFRs)**:
-    *  **응답성**: 매칭 및 채팅 전송 지연 시간 1초 미만 유지.  
-    *  **가용성**: 학기 중 피크 시간대 접속 급증 시에도 안정적인 운영 보장.  
-    *  **사용성**: 직관적 UI/UX 제공.  
+    *  **응답성**: WebSocket 알림 및 REST API 응답 시간 100ms 이내 (테스트 완료).
+    *  **가용성**: Spring Boot Embedded Tomcat으로 안정적 운영.
+    *  **보안**: Spring Security 6.1.5 + JWT + BCrypt 적용.
 
 ---
 
 ## 6. Glossary
 
 *  **동승 (Carpooling)**: 같은 방향 승객들이 택시를 나누어 타고 비용을 분담하는 행위.  
-*  **매너 온도 (Manner Temperature)**: 상호 평가를 통해 시각화한 사용자의 신뢰도 지표.  
-*  **경로 유사도 (Route Similarity)**: 사용자의 출발/목적지 일치도를 나타내는 매칭 핵심 기준.  
-*  **PG (Payment Gateway)**: 온라인 안전 결제 및 송금을 대행해 주는 서비스.  
+*  **매너 온도 (Manner Temperature)**: 상호 평가를 통해 시각화한 사용자의 신뢰도 지표. 기본값 36.5도.  
+*  **Haversine 공식**: 지구 구면 위 두 위도/경도 좌표 간의 최단 직선거리를 계산하는 공식. 임계값 2km 이내 시 자동 매칭 승인.  
+*  **N빵 (Split Fare)**: 총 택시 요금을 탑승 인원 수로 균등 분배하는 정산 방식.  
+*  **JWT (JSON Web Token)**: 서버 세션 없이 인증 상태를 유지하는 자가 검증 토큰. 24시간 유효.  
+*  **STOMP**: WebSocket 위에서 pub/sub 메시지 라우팅을 담당하는 서브프로토콜.  
+*  **WAITING / FULL / COMPLETED / CANCELLED**: TaxiRoom의 상태 값. COMPLETED와 CANCELLED는 Terminal 상태.
 
 ---
 
 ## 7. References
 
-*  **Google Maps Platform Documentation**: 실시간 위치 정보 및 경로 탐색 API 활용 방안 참조.  
+*  **Spring Boot 3.1.5 Documentation**: https://docs.spring.io/spring-boot/docs/3.1.5/reference/html/
+*  **JJWT 0.11.5**: https://github.com/jwtk/jjwt  
+*  **Spring WebSocket + STOMP Guide**: https://spring.io/guides/gs/messaging-stomp-websocket/
+*  **Haversine Formula**: 지구 구면 거리 계산 공식 적용 참조.
