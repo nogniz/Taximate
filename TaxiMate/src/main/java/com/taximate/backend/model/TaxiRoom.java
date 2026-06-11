@@ -3,15 +3,14 @@ package com.taximate.backend.model;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
-@Entity // 💡 DB 테이블로 관리하겠다고 선언
+@Entity
 @Data
-@NoArgsConstructor // JPA 필수 기본 생성자
+@NoArgsConstructor
 public class TaxiRoom {
 
-    @Id // 💡 PK (기본키) 설정
+    @Id
     private String roomId;
     private String title;
     private String departure;
@@ -20,10 +19,23 @@ public class TaxiRoom {
     private int maxParticipants;
     private String status;
 
-    @ElementCollection(fetch = FetchType.EAGER) // 💡 값 타입 컬렉션 매핑 (userIds 리스트 저장용)
+    @ElementCollection(fetch = FetchType.EAGER)
     private List<String> userIds = new ArrayList<>();
 
-    public TaxiRoom(String roomId, String title, String departure, String destination, String departureTime, int maxParticipants) {
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_destinations", joinColumns = @JoinColumn(name = "room_id"))
+    @MapKeyColumn(name = "user_id")
+    @Column(name = "destination")
+    private Map<String, String> userDestinations = new HashMap<>();
+
+    /** 탑승완료 누른 유저 목록 */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "boarded_users", joinColumns = @JoinColumn(name = "room_id"))
+    @Column(name = "user_id")
+    private Set<String> boardedUsers = new HashSet<>();
+
+    public TaxiRoom(String roomId, String title, String departure, String destination,
+                    String departureTime, int maxParticipants) {
         this.roomId = roomId;
         this.title = title;
         this.departure = departure;
@@ -34,13 +46,40 @@ public class TaxiRoom {
     }
 
     public synchronized boolean addUser(String userId) {
+        return addUser(userId, null);
+    }
+
+    public synchronized boolean addUser(String userId, String personalDestination) {
         if (userIds.size() < maxParticipants && !userIds.contains(userId)) {
             userIds.add(userId);
-            if (userIds.size() == maxParticipants) {
-                this.status = "FULL";
-            }
+            userDestinations.put(userId,
+                    (personalDestination != null && !personalDestination.isBlank())
+                            ? personalDestination : this.destination);
+            if (userIds.size() == maxParticipants) this.status = "FULL";
             return true;
         }
         return false;
+    }
+
+    /** 탑승완료 처리 */
+    public boolean boardUser(String userId) {
+        if (!userIds.contains(userId)) return false;
+        return boardedUsers.add(userId);
+    }
+
+    /** 전원 탑승 여부 */
+    public boolean isAllBoarded() {
+        return !userIds.isEmpty() && boardedUsers.containsAll(userIds);
+    }
+
+    /** 강퇴 (방장만 호출) */
+    public boolean kickUser(String targetId) {
+        if (!userIds.contains(targetId)) return false;
+        userIds.remove(targetId);
+        userDestinations.remove(targetId);
+        boardedUsers.remove(targetId);
+        // FULL이었으면 다시 WAITING
+        if ("FULL".equals(status)) status = "WAITING";
+        return true;
     }
 }
