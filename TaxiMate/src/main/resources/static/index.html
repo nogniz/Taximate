@@ -198,6 +198,19 @@ body{font-family:'Segoe UI',Apple SD Gothic Neo,sans-serif;background:#f4f6fb;co
 .history-date{font-size:12px;color:#aaa;margin-top:2px}
 .history-meta{display:flex;gap:14px;font-size:12px;color:#888;margin-top:8px}
 .history-fare{font-size:20px;font-weight:900;color:#e94560;margin-top:6px}
+
+/* ── Location Picker ── */
+.loc-field{background:#f8f9fa;border:2px solid #eee;border-radius:14px;padding:13px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:border-color .15s;width:100%}
+.loc-field:active{border-color:#e94560}
+.loc-field .loc-ph{color:#bbb;font-size:15px}
+.loc-field .loc-val{color:#1a1a2e;font-size:15px;font-weight:600}
+.loc-field .loc-arrow{color:#ccc;font-size:18px;margin-left:6px;flex-shrink:0}
+.loc-list-item{padding:14px 16px;border-bottom:1px solid #f4f4f4;cursor:pointer;border-radius:10px;transition:background .1s;display:flex;align-items:center;gap:10px}
+.loc-list-item:active{background:#fef0f3}
+.loc-list-item .loc-icon{font-size:18px;width:28px;text-align:center}
+.loc-list-item .loc-name{font-size:15px;font-weight:700;color:#1a1a2e}
+.loc-list-item .loc-sub{font-size:12px;color:#aaa;margin-top:2px}
+#loc-search:focus{border-color:#e94560;outline:none}
 </style>
 </head>
 <body>
@@ -267,8 +280,22 @@ body{font-family:'Segoe UI',Apple SD Gothic Neo,sans-serif;background:#f4f6fb;co
   </div>
   <div class="create-body">
     <div class="field"><label>방 제목</label><input id="c-title" placeholder="예) 영대 정문에서 대구은행역 가실 분"></div>
-    <div class="field"><label>출발지</label><input id="c-dep" placeholder="예) 영남대 정문"></div>
-    <div class="field"><label>목적지</label><input id="c-dest" placeholder="예) 대구은행역"></div>
+    <div class="field">
+      <label>출발지</label>
+      <div class="loc-field" onclick="openLocationPicker('c-dep','출발지 선택')">
+        <span id="c-dep-label" class="loc-ph">출발지 선택</span>
+        <span class="loc-arrow">›</span>
+      </div>
+      <input type="hidden" id="c-dep">
+    </div>
+    <div class="field">
+      <label>목적지</label>
+      <div class="loc-field" onclick="openLocationPicker('c-dest','목적지 선택')">
+        <span id="c-dest-label" class="loc-ph">목적지 선택</span>
+        <span class="loc-arrow">›</span>
+      </div>
+      <input type="hidden" id="c-dest">
+    </div>
     <div class="field"><label>출발 일시</label><input id="c-time" type="datetime-local" onchange="guardPastTime(this)"></div>
     <div class="field"><label>최대 인원</label>
       <select id="c-max">
@@ -294,8 +321,22 @@ body{font-family:'Segoe UI',Apple SD Gothic Neo,sans-serif;background:#f4f6fb;co
       목적지를 입력하면 <strong>Haversine 거리 계산</strong>으로 2km 이내 방에 자동 합류됩니다.<br>
       맞는 방이 없으면 새 방이 자동으로 만들어집니다.
     </div>
-    <div class="field"><label>내 출발지</label><input id="m-dep" placeholder="예) 영남대 정문"></div>
-    <div class="field"><label>목적지</label><input id="m-dest" placeholder="예) 반월당역"></div>
+    <div class="field">
+      <label>내 출발지</label>
+      <div class="loc-field" onclick="openLocationPicker('m-dep','출발지 선택')">
+        <span id="m-dep-label" class="loc-ph">출발지 선택</span>
+        <span class="loc-arrow">›</span>
+      </div>
+      <input type="hidden" id="m-dep">
+    </div>
+    <div class="field">
+      <label>목적지</label>
+      <div class="loc-field" onclick="openLocationPicker('m-dest','목적지 선택')">
+        <span id="m-dest-label" class="loc-ph">목적지 선택</span>
+        <span class="loc-arrow">›</span>
+      </div>
+      <input type="hidden" id="m-dest">
+    </div>
     <div class="field"><label>출발 일시</label><input id="m-time" type="datetime-local" onchange="guardPastTime(this)"></div>
     <button class="btn btn-red" style="margin-top:8px" id="match-btn" onclick="doMatch()">매칭 요청하기</button>
     <div id="match-result" style="margin-top:16px"></div>
@@ -367,16 +408,36 @@ body{font-family:'Segoe UI',Apple SD Gothic Neo,sans-serif;background:#f4f6fb;co
 <div id="join-modal" class="modal-overlay" style="display:none">
   <div class="modal-sheet">
     <h3>방 참여하기</h3>
-    <div class="modal-sub">내 목적지를 입력하면 거리 비율에 따라 정산이 자동으로 나눠집니다.</div>
-    <div class="field">
+    <div class="modal-sub">내 목적지를 선택하면 거리 비율에 따라 정산이 자동으로 나눠집니다.</div>
+    <div class="field" style="margin-top:16px">
       <label>내 목적지</label>
-      <input id="join-dest" placeholder="예) 반월당역" style="border:2px solid #eee;border-radius:12px;padding:13px 16px;font-size:15px;width:100%;outline:none">
+      <div class="loc-field" onclick="openLocationPicker('join-dest','내 목적지 선택')">
+        <span id="join-dest-label" class="loc-ph">목적지 선택 (선택사항)</span>
+        <span class="loc-arrow">›</span>
+      </div>
+      <input type="hidden" id="join-dest">
     </div>
     <div style="margin-top:6px;font-size:12px;color:#aaa">비워두면 방의 공통 목적지로 처리됩니다</div>
     <div style="display:flex;gap:10px;margin-top:20px">
       <button class="btn btn-grey" style="flex:1" onclick="document.getElementById('join-modal').style.display='none'">취소</button>
       <button class="btn btn-red" style="flex:1" onclick="confirmJoin()">참여하기</button>
     </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     LOCATION PICKER MODAL
+══════════════════════════════════════════ -->
+<div id="loc-picker" class="modal-overlay" style="display:none" onclick="if(event.target===this)closePicker()">
+  <div class="modal-sheet" style="max-height:80vh;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom,24px)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <h3 id="loc-picker-title" style="margin:0">목적지 선택</h3>
+      <button onclick="closePicker()" style="background:none;border:none;font-size:22px;color:#aaa;cursor:pointer;line-height:1">✕</button>
+    </div>
+    <input id="loc-search" type="text" placeholder="역명이나 장소 검색..."
+           oninput="filterLocations(this.value)"
+           style="border:2px solid #eee;border-radius:12px;padding:12px 16px;font-size:15px;margin-bottom:10px;width:100%">
+    <div id="loc-list" style="overflow-y:auto;flex:1;margin:0 -8px;padding:0 8px"></div>
   </div>
 </div>
 
@@ -480,6 +541,23 @@ function goPage(id) {
     const mt = document.getElementById('m-time');
     if (ct) { ct.min = mn; if (!ct.value || ct.value < mn) ct.value = mn; }
     if (mt) { mt.min = mn; if (!mt.value || mt.value < mn) mt.value = mn; }
+  }
+  // 방 만들기 진입 시 장소 선택 초기화
+  if (id === 'create') {
+    ['c-dep','c-dest'].forEach(fid => {
+      const hi = document.getElementById(fid);
+      const lb = document.getElementById(fid + '-label');
+      if (hi) hi.value = '';
+      if (lb) { lb.textContent = fid === 'c-dep' ? '출발지 선택' : '목적지 선택'; lb.className = 'loc-ph'; }
+    });
+  }
+  if (id === 'match') {
+    ['m-dep','m-dest'].forEach(fid => {
+      const hi = document.getElementById(fid);
+      const lb = document.getElementById(fid + '-label');
+      if (hi) hi.value = '';
+      if (lb) { lb.textContent = fid === 'm-dep' ? '출발지 선택' : '목적지 선택'; lb.className = 'loc-ph'; }
+    });
   }
 }
 
@@ -732,7 +810,10 @@ let _joinRoomId = null;
 
 function doJoin(roomId) {
   _joinRoomId = roomId;
+  // hidden input + 표시 레이블 초기화
   document.getElementById('join-dest').value = '';
+  const lbl = document.getElementById('join-dest-label');
+  if (lbl) { lbl.textContent = '목적지 선택 (선택사항)'; lbl.className = 'loc-ph'; }
   document.getElementById('join-modal').style.display = 'flex';
 }
 
@@ -1254,8 +1335,99 @@ function guardPastTime(el) {
     el.value = now;
     toast('⚠️ 현재 시각 이전은 선택할 수 없어요', true);
   }
-  // min도 항상 최신으로 갱신
   el.min = now;
+}
+
+// ══════════════════════════════════════════════════════
+//  Location Picker — 선택지 기반 장소 선택
+//  모든 장소는 백엔드 DAEGU_COORDS와 1:1 대응되어 좌표 오류 없음
+// ══════════════════════════════════════════════════════
+const LOCATIONS = [
+  // 영남대 캠퍼스
+  { name: '영대정문',         sub: '영남대학교 정문',           icon: '🏫' },
+  { name: '영남대학교',       sub: '영남대학교',                icon: '🏫' },
+  { name: '영대병원역',       sub: '대구 1호선 · 경산',         icon: '🚇' },
+  // 1호선 도심 주요 역
+  { name: '경대병원역',       sub: '대구 1호선 · 중구 (경북대병원)', icon: '🚇' },
+  { name: '대구역',           sub: '대구 1호선 · KTX',          icon: '🚆' },
+  { name: '반월당역',         sub: '대구 1·2호선 환승 · 중구',  icon: '🚇' },
+  { name: '대구은행역',       sub: '대구 2호선 · 수성구',        icon: '🚇' },
+  // 2호선 수성구 방향
+  { name: '황금역',           sub: '대구 2호선 · 수성구',        icon: '🚇' },
+  { name: '수성구청역',       sub: '대구 2호선 · 수성구',        icon: '🚇' },
+  { name: '범어역',           sub: '대구 2호선 · 수성구',        icon: '🚇' },
+  // 2호선 경산 방향
+  { name: '대공원역',         sub: '대구 2호선 · 수성구',        icon: '🚇' },
+  { name: '고산역',           sub: '대구 2호선 · 수성구',        icon: '🚇' },
+  { name: '신매역',           sub: '대구 2호선 · 경산',          icon: '🚇' },
+  { name: '사월역',           sub: '대구 2호선 · 경산',          icon: '🚇' },
+  { name: '임당역',           sub: '대구 2호선 · 경산',          icon: '🚇' },
+  { name: '경산역',           sub: '대구 2호선 · 경산',          icon: '🚇' },
+  // 동쪽 주요
+  { name: '동대구역',         sub: '대구 1호선 · KTX · 동구',   icon: '🚆' },
+  // 3호선 (칠곡)
+  { name: '칠곡경대병원역',   sub: '대구 3호선 · 북구 칠곡 (경북대병원)', icon: '🚇' },
+  { name: '북부정류장',       sub: '대구 북부정류장 · 북구',     icon: '🚌' },
+  // 서쪽·남쪽
+  { name: '서문시장',         sub: '대구 3호선 · 중구',          icon: '🏪' },
+  { name: '동성로',           sub: '대구 도심 · 중구',           icon: '🏙️' },
+  { name: '두류공원',         sub: '대구 달서구',                icon: '🌳' },
+  { name: '서부정류장',       sub: '대구 서부정류장 · 달서구',   icon: '🚌' },
+  { name: '남부정류장',       sub: '대구 남부정류장 · 남구',     icon: '🚌' },
+  { name: '칠성시장',         sub: '대구 북구',                  icon: '🏪' },
+  { name: '대구공항',         sub: '대구국제공항 · 동구',        icon: '✈️' },
+];
+
+let _pickerTargetId = null;   // 선택 결과를 저장할 hidden input id
+let _pickerCallback = null;   // 선택 후 추가 동작이 필요하면 여기에
+
+function openLocationPicker(targetId, title) {
+  _pickerTargetId = targetId;
+  document.getElementById('loc-picker-title').textContent = title || '장소 선택';
+  document.getElementById('loc-search').value = '';
+  filterLocations('');
+  document.getElementById('loc-picker').style.display = 'flex';
+  setTimeout(() => document.getElementById('loc-search').focus(), 200);
+}
+
+function closePicker() {
+  document.getElementById('loc-picker').style.display = 'none';
+  _pickerTargetId = null;
+}
+
+function filterLocations(query) {
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? LOCATIONS.filter(l => l.name.toLowerCase().includes(q) || l.sub.toLowerCase().includes(q))
+    : LOCATIONS;
+
+  const listEl = document.getElementById('loc-list');
+  if (filtered.length === 0) {
+    listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#aaa;font-size:14px">검색 결과가 없어요</div>';
+    return;
+  }
+  listEl.innerHTML = filtered.map(l => `
+    <div class="loc-list-item" onclick="selectLocation('${esc(l.name)}')">
+      <span class="loc-icon">${l.icon}</span>
+      <div>
+        <div class="loc-name">${esc(l.name)}</div>
+        <div class="loc-sub">${esc(l.sub)}</div>
+      </div>
+    </div>`).join('');
+}
+
+function selectLocation(name) {
+  if (!_pickerTargetId) return;
+  // hidden input에 값 저장
+  document.getElementById(_pickerTargetId).value = name;
+  // 표시 버튼의 텍스트 업데이트
+  const labelEl = document.getElementById(_pickerTargetId + '-label');
+  if (labelEl) {
+    labelEl.textContent = name;
+    labelEl.classList.remove('loc-ph');
+    labelEl.classList.add('loc-val');
+  }
+  closePicker();
 }
 </script>
 </body>
