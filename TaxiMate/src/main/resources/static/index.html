@@ -8,9 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;overflow:hidden}
-body{font-family:'Segoe UI',Apple SD Gothic Neo,sans-serif;background:#f4f6fb;color:#1a1a2e;height:100%;max-width:480px;margin:0 auto;position:relative}
-.page{overflow-y:auto}
+body{font-family:'Segoe UI',Apple SD Gothic Neo,sans-serif;background:#f4f6fb;color:#1a1a2e;min-height:100vh;max-width:480px;margin:0 auto;position:relative}
 
 /* ── Toast ── */
 #toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:12px 24px;border-radius:24px;font-size:13px;font-weight:600;opacity:0;transition:opacity .3s;z-index:9999;pointer-events:none;white-space:nowrap}
@@ -18,7 +16,7 @@ body{font-family:'Segoe UI',Apple SD Gothic Neo,sans-serif;background:#f4f6fb;co
 #toast.err{background:#e94560}
 
 /* ── Pages ── */
-.page{display:none;height:100%;padding-bottom:80px;overflow-y:auto}
+.page{display:none;min-height:100vh;padding-bottom:80px}
 .page.active{display:block}
 
 /* ── Auth Page ── */
@@ -150,8 +148,9 @@ body{font-family:'Segoe UI',Apple SD Gothic Neo,sans-serif;background:#f4f6fb;co
 .loader{text-align:center;padding:40px;color:#ccc;font-size:13px}
 
 /* ── Chat ── */
-#page-chatroom{display:flex;flex-direction:column;height:100vh;padding-bottom:0!important}
-/* chatroom 페이지에서 bottomNav 숨김 처리는 JS에서 */
+/* chatroom은 fixed 오버레이로 전체 화면 덮기 → 다른 페이지 내용 안 비침 */
+#page-chatroom{display:none;flex-direction:column;position:fixed;top:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;height:100%;z-index:300;background:#f4f6fb;padding-bottom:0!important}
+#page-chatroom.active{display:flex}
 .chat-messages{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;background:#f4f6fb}
 .msg-wrap{display:flex;flex-direction:column}
 .msg-wrap.mine{align-items:flex-end}
@@ -270,7 +269,7 @@ body{font-family:'Segoe UI',Apple SD Gothic Neo,sans-serif;background:#f4f6fb;co
     <div class="field"><label>방 제목</label><input id="c-title" placeholder="예) 영대 정문에서 대구은행역 가실 분"></div>
     <div class="field"><label>출발지</label><input id="c-dep" placeholder="예) 영남대 정문"></div>
     <div class="field"><label>목적지</label><input id="c-dest" placeholder="예) 대구은행역"></div>
-    <div class="field"><label>출발 시간</label><input id="c-time" type="time" value="21:30"></div>
+    <div class="field"><label>출발 일시</label><input id="c-time" type="datetime-local"></div>
     <div class="field"><label>최대 인원</label>
       <select id="c-max">
         <option value="2">2명</option>
@@ -297,7 +296,7 @@ body{font-family:'Segoe UI',Apple SD Gothic Neo,sans-serif;background:#f4f6fb;co
     </div>
     <div class="field"><label>내 출발지</label><input id="m-dep" placeholder="예) 영남대 정문"></div>
     <div class="field"><label>목적지</label><input id="m-dest" placeholder="예) 반월당역"></div>
-    <div class="field"><label>출발 시간</label><input id="m-time" type="time" value="21:30"></div>
+    <div class="field"><label>출발 일시</label><input id="m-time" type="datetime-local"></div>
     <button class="btn btn-red" style="margin-top:8px" id="match-btn" onclick="doMatch()">매칭 요청하기</button>
     <div id="match-result" style="margin-top:16px"></div>
   </div>
@@ -474,6 +473,14 @@ function goPage(id) {
   if (id === 'profile') loadProfile();
   if (id === 'history') loadHistory();
   if (id === 'chat') loadChatList();
+  // 방 만들기 / 자동매칭 진입 시 현재시각 min 설정 (과거 선택 불가)
+  if (id === 'create' || id === 'match') {
+    const mn = nowForInput();
+    const ct = document.getElementById('c-time');
+    const mt = document.getElementById('m-time');
+    if (ct) { ct.min = mn; if (!ct.value || ct.value < mn) ct.value = mn; }
+    if (mt) { mt.min = mn; if (!mt.value || mt.value < mn) mt.value = mn; }
+  }
 }
 
 // ── API helper ───────────────────────────────────────────────────────────────
@@ -596,7 +603,7 @@ function roomCard(room) {
       <span>${esc(room.destination)}</span>
     </div>
     <div class="room-meta">
-      <span>🕐 ${esc(room.departureTime)}</span>
+      <span>🕐 ${fmtTime(room.departureTime)}</span>
       <span>👥 ${members}/${max}명</span>
       <span>🔑 ${room.roomId}</span>
     </div>
@@ -696,7 +703,7 @@ function renderDetail(room) {
       </div>
     </div>
     <div class="detail-info-grid">
-      <div class="info-box"><div class="ib-label">출발 시간</div><div class="ib-val">${esc(room.departureTime)}</div></div>
+      <div class="info-box"><div class="ib-label">출발 일시</div><div class="ib-val" style="font-size:14px">${fmtTime(room.departureTime)}</div></div>
       <div class="info-box"><div class="ib-label">인원</div><div class="ib-val">${(room.userIds||[]).length} / ${room.maxParticipants}명</div></div>
       <div class="info-box"><div class="ib-label">방 ID</div><div class="ib-val" style="font-size:13px">${room.roomId}</div></div>
       <div class="info-box"><div class="ib-label">상태</div><div class="ib-val" style="font-size:13px">${room.status}</div></div>
@@ -813,7 +820,7 @@ async function doMatch() {
         <div style="font-size:15px;font-weight:800;color:${isMatched ? '#1e8449' : '#1a5276'};margin-bottom:6px">
           ${isMatched ? '✅ 기존 방에 합류됐습니다!' : '🆕 새 방이 만들어졌습니다'}
         </div>
-        <div style="font-size:13px;color:#555;margin-bottom:12px">${esc(room.departure)} → ${esc(room.destination)} | ${esc(room.departureTime)} | ${(room.userIds||[]).length}/${room.maxParticipants}명</div>
+        <div style="font-size:13px;color:#555;margin-bottom:12px">${esc(room.departure)} → ${esc(room.destination)} | ${fmtTime(room.departureTime)} | ${(room.userIds||[]).length}/${room.maxParticipants}명</div>
         <button class="btn btn-red btn-sm" onclick="openRoom('${room.roomId}')">방으로 이동 →</button>
       </div>`;
   } else {
@@ -968,7 +975,7 @@ async function loadHistory() {
       <div class="history-top">
         <div>
           <div class="history-route">${esc(room.departure)} → ${esc(room.destination)}</div>
-          <div style="font-size:12px;color:#aaa;margin-top:3px">출발 ${esc(room.departureTime)}</div>
+          <div style="font-size:12px;color:#aaa;margin-top:3px">출발 ${fmtTime(room.departureTime)}</div>
         </div>
         ${allRated
           ? `<span class="badge badge-completed">평가완료</span>`
@@ -1198,6 +1205,26 @@ function getMyId() {
 }
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// datetime-local 값(2026-06-11T14:30) → 읽기 좋은 표시(06/11 14:30)
+function fmtTime(s) {
+  if (!s) return '';
+  try {
+    if (s.includes('T')) {
+      const [date, time] = s.split('T');
+      const [,mm,dd] = date.split('-');
+      return mm + '/' + dd + ' ' + time.slice(0,5);
+    }
+    return s; // 구형 HH:mm 그대로
+  } catch { return s; }
+}
+
+// 현재 시각을 datetime-local input의 min 값으로 반환
+function nowForInput() {
+  const d = new Date();
+  d.setSeconds(0, 0);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
 </script>
 </body>
