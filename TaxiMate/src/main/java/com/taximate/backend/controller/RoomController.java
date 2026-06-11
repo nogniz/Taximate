@@ -5,6 +5,7 @@ import com.taximate.backend.service.TaxiRoomManager;
 import com.taximate.backend.service.MatchEngine;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -41,7 +42,117 @@ public class RoomController {
         return ResponseEntity.ok(roomManager.getAllRooms());
     }
 
-    // 3. 실시간 최적의 방 자동 매칭 요청 API (POST /api/rooms/match)
+    // 2-1. 내 이용 내역 (SETTLED 상태이고 내가 멤버인 방)
+    @GetMapping("/history")
+    public ResponseEntity<List<TaxiRoom>> getMyHistory(Authentication auth) {
+        String studentId = (String) auth.getPrincipal();
+        List<TaxiRoom> history = roomManager.getAllRooms().stream()
+                .filter(r -> "SETTLED".equals(r.getStatus()) && r.getUserIds().contains(studentId))
+                .collect(java.util.stream.Collectors.toList());
+        return ResponseEntity.ok(history);
+    }
+
+    // 3. 특정 방 단건 조회 API (GET /api/rooms/{roomId})
+    @GetMapping("/{roomId}")
+    public ResponseEntity<?> getRoom(@PathVariable String roomId) {
+        TaxiRoom room = roomManager.getRoom(roomId);
+        if (room == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(room);
+    }
+
+    // 3-1. 방 직접 참여 API (POST /api/rooms/{roomId}/join)
+    // Body(optional): { "destination": "반월당역" }
+    @PostMapping("/{roomId}/join")
+    public ResponseEntity<?> joinRoom(@PathVariable String roomId,
+                                      @RequestBody(required = false) Map<String, String> body,
+                                      Authentication auth) {
+        String studentId = (String) auth.getPrincipal();
+        String destination = (body != null) ? body.getOrDefault("destination", null) : null;
+        boolean joined = roomManager.joinRoom(roomId, studentId, destination);
+        if (joined) {
+            TaxiRoom room = roomManager.getRoom(roomId);
+            return ResponseEntity.ok(Map.of("status", "SUCCESS", "room", room));
+        } else {
+            return ResponseEntity.badRequest().body(Map.of("status", "ERROR", "message", "참여할 수 없습니다. (만석이거나 이미 참여 중)"));
+        }
+    }
+
+    // 4. 탑승 완료 처리 API (PATCH /api/rooms/{roomId}/complete)
+    // Header: Authorization: Bearer <token>
+    @PatchMapping("/{roomId}/complete")
+    public ResponseEntity<?> completeRoom(@PathVariable String roomId, Authentication auth) {
+        String studentId = (String) auth.getPrincipal();
+        try {
+            TaxiRoom room = roomManager.completeRoom(roomId, studentId);
+            return ResponseEntity.ok(Map.of("status", "SUCCESS", "room", room));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("status", "ERROR", "message", e.getMessage()));
+        }
+    }
+
+    // 5. 방 취소 API (PATCH /api/rooms/{roomId}/cancel) - 방장만 가능
+    // Header: Authorization: Bearer <token>
+    @PatchMapping("/{roomId}/cancel")
+    public ResponseEntity<?> cancelRoom(@PathVariable String roomId, Authentication auth) {
+        String studentId = (String) auth.getPrincipal();
+        try {
+            TaxiRoom room = roomManager.cancelRoom(roomId, studentId);
+            return ResponseEntity.ok(Map.of("status", "SUCCESS", "room", room));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("status", "ERROR", "message", e.getMessage()));
+        }
+    }
+
+    // 6a. 탑승완료 표시 (모든 멤버 가능)
+    @PostMapping("/{roomId}/board")
+    public ResponseEntity<?> boardRoom(@PathVariable String roomId, Authentication auth) {
+        String studentId = (String) auth.getPrincipal();
+        try {
+            TaxiRoom room = roomManager.boardUser(roomId, studentId);
+            return ResponseEntity.ok(Map.of(
+                    "status", "SUCCESS",
+                    "boardedCount", room.getBoardedUsers().size(),
+                    "totalCount", room.getUserIds().size(),
+                    "allBoarded", room.isAllBoarded(),
+                    "room", room));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("status", "ERROR", "message", e.getMessage()));
+        }
+    }
+
+    // 6b. 출발 (방장만, 전원 탑승완료 시에만)
+    @PatchMapping("/{roomId}/depart")
+    public ResponseEntity<?> departRoom(@PathVariable String roomId, Authentication auth) {
+        String studentId = (String) auth.getPrincipal();
+        try {
+            TaxiRoom room = roomManager.departRoom(roomId, studentId);
+            return ResponseEntity.ok(Map.of("status", "SUCCESS", "room", room));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("status", "ERROR", "message", e.getMessage()));
+        }
+    }
+
+    // 6c. 강퇴 (방장만 가능)
+    @DeleteMapping("/{roomId}/kick/{targetId}")
+    public ResponseEntity<?> kickUser(@PathVariable String roomId,
+                                      @PathVariable String targetId,
+                                      Authentication auth) {
+        String studentId = (String) auth.getPrincipal();
+        try {
+            TaxiRoom room = roomManager.kickUser(roomId, studentId, targetId);
+            return ResponseEntity.ok(Map.of("status", "SUCCESS", "room", room));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("status", "ERROR", "message", e.getMessage()));
+        }
+    }
+
+    // 6. 실시간 최적의 방 자동 매칭 요청 API (POST /api/rooms/match)
     @PostMapping("/match")
     public ResponseEntity<?> autoMatch(@RequestBody Map<String, Object> request) {
         String userId = (String) request.get("userId");
