@@ -75,44 +75,68 @@ public class PaymentService {
         return saved;
     }
 
-    // 거리 비율 기반 개인 금액 계산 (출발지 ~ 각자 목적지)
+    // 순차 하차 방식 요금 분배
+    // 택시는 모두 함께 타서 가까운 목적지 순서로 내림
+    // 각 구간 요금은 그 구간에 탑승한 인원수로 나눔
     private Map<String, Integer> calcDistanceFareSplit(TaxiRoom room, int totalFare) {
         Map<String, String> userDests = room.getUserDestinations();
         String departure = room.getDeparture();
-        java.util.List<String> users = room.getUserIds();
+        java.util.List<String> users = new java.util.ArrayList<>(room.getUserIds());
+        Map<String, Integer> split = new HashMap<>();
+        users.forEach(u -> split.put(u, 0));
 
-        // 각 유저의 거리 계산
-        Map<String, Double> distMap = new HashMap<>();
+        // 각 유저의 출발지→목적지 거리 계산
+        Map<String, Double> distFromDep = new HashMap<>();
         for (String uid : users) {
             String dest = userDests.getOrDefault(uid, room.getDestination());
             double dist = matchEngine.getDistanceBetweenPlaces(departure, dest);
-            distMap.put(uid, Math.max(dist, 0.1)); // 최소 0.1km (0원 방지)
+            distFromDep.put(uid, Math.max(dist, 0.01));
         }
 
-        double totalDist = distMap.values().stream().mapToDouble(Double::doubleValue).sum();
-        Map<String, Integer> split = new HashMap<>();
+        // 거리 기준 오름차순 정렬 (가까운 순 = 먼저 내리는 순)
+        users.sort(java.util.Comparator.comparingDouble(distFromDep::get));
 
-        if (totalDist <= 0) {
-            // 거리 계산 실패 시 균등 분배
+        // 전체 노선 거리 = 가장 멀리 가는 사람의 거리
+        double totalRouteDist = distFromDep.get(users.get(users.size() - 1));
+        if (totalRouteDist <= 0) {
             int eq = (int) Math.ceil((double) totalFare / users.size());
-            users.forEach(uid -> split.put(uid, eq));
+            split.replaceAll((k, v) -> eq);
             return split;
         }
 
-        // 비율대로 계산하되 반올림 오차는 첫 번째 유저에게 흡수
-        int allocated = 0;
+        // 구간별 요금 계산
+        // 구간 i: i-1번째 하차 지점 ~ i번째 하차 지점
+        // 해당 구간에 탑승한 인원 = (users.size() - i)명
+        double prevDist = 0.0;
+        int remaining = totalFare;
         for (int i = 0; i < users.size(); i++) {
             String uid = users.get(i);
+            double currDist = distFromDep.get(uid);
+            double legDist = currDist - prevDist;          // 이번 구간 거리
+            int passengersOnLeg = users.size() - i;         // 이 구간 탑승 인원
+
+            // 이번 구간 요금 = totalFare × (legDist / totalRouteDist)
+            int legFare;
             if (i < users.size() - 1) {
-                int fare = (int) Math.round(totalFare * distMap.get(uid) / totalDist);
-                split.put(uid, Math.max(fare, 0));
-                allocated += fare;
+                legFare = (int) Math.round(totalFare * legDist / totalRouteDist);
+                remaining -= legFare;
             } else {
-                split.put(uid, Math.max(totalFare - allocated, 0));
+                legFare = remaining; // 마지막 구간 = 남은 금액 (반올림 오차 흡수)
             }
+
+            // 이 구간을 탄 모든 사람(i번째 이후 포함)에게 1/passengersOnLeg씩 부과
+            int perPerson = (int) Math.ceil((double) legFare / passengersOnLeg);
+            for (int j = i; j < users.size(); j++) {
+                split.merge(users.get(j), perPerson, Integer::sum);
+            }
+
+            prevDist = currDist;
         }
 
-        System.out.println("[PaymentService] 거리 비율 정산: " + split);
+        System.out.println("[PaymentService] 순차하차 정산: " + split
+                + " | 거리순: " + users.stream()
+                    .map(u -> u + "→" + String.format("%.1f", distFromDep.get(u)) + "km")
+                    .collect(java.util.stream.Collectors.joining(", ")));
         return split;
     }
 
