@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>TaxiMate</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:'Segoe UI',Apple SD Gothic Neo,sans-serif;background:#f4f6fb;color:#1a1a2e;min-height:100vh;max-width:480px;margin:0 auto;position:relative}
+
+/* ── Toast ── */
+#toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:12px 24px;border-radius:24px;font-size:13px;font-weight:600;opacity:0;transition:opacity .3s;z-index:9999;pointer-events:none;white-space:nowrap}
+#toast.show{opacity:1}
+#toast.err{background:#e94560}
+
+/* ── Pages ── */
+.page{display:none;min-height:100vh;padding-bottom:80px}
+.page.active{display:block}
+
+/* ── Auth Page ── */
+#page-auth{background:linear-gradient(160deg,#1a1a2e 0%,#16213e 60%,#0f3460 100%);padding-bottom:0;min-height:100vh;display:none;flex-direction:column;justify-content:center}
+#page-auth.active{display:flex}
+.auth-logo{text-align:center;margin-bottom:40px}
+.auth-logo .icon{width:64px;height:64px;background:#e94560;border-radius:18px;display:inline-flex;align-items:center;justify-content:center;font-size:28px;font-weight:900;color:#fff;margin-bottom:12px}
+.auth-logo h1{color:#fff;font-size:26px;font-weight:800}
+.auth-logo p{color:rgba(255,255,255,.5);font-size:13px;margin-top:4px}
+.auth-card{background:#fff;border-radius:28px 28px 0 0;padding:32px 24px 48px;flex:1}
+.auth-tabs{display:flex;background:#f4f6fb;border-radius:12px;padding:4px;margin-bottom:24px}
+.auth-tab{flex:1;text-align:center;padding:10px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;color:#888;transition:all .2s}
+.auth-tab.active{background:#fff;color:#e94560;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.auth-panel{display:none}
+.auth-panel.active{display:block}
+
+/* ── Form elements ── */
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;font-weight:700;color:#888;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}
+.field input,.field select{width:100%;padding:13px 16px;border:2px solid #eee;border-radius:12px;font-size:15px;outline:none;transition:border .2s;background:#fff}
+.field input:focus,.field select:focus{border-color:#e94560}
+.field .row{display:flex;gap:8px}
+.field .row input{flex:1}
+
+/* ── Buttons ── */
+.btn{display:block;width:100%;padding:15px;border:none;border-radius:14px;font-size:15px;font-weight:700;cursor:pointer;transition:transform .1s,opacity .2s;text-align:center}
+.btn:active{transform:scale(.97)}
+.btn-red{background:#e94560;color:#fff}
+.btn-dark{background:#1a1a2e;color:#fff}
+.btn-outline{background:#fff;color:#e94560;border:2px solid #e94560}
+.btn-green{background:#27ae60;color:#fff}
+.btn-sm{padding:9px 18px;font-size:13px;width:auto;display:inline-block;border-radius:10px}
+.btn-grey{background:#f4f6fb;color:#555}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* ── Top bar ── */
+.topbar{position:sticky;top:0;background:#fff;z-index:100;padding:16px 20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #f0f0f0}
+.topbar h2{font-size:18px;font-weight:800;flex:1}
+.topbar .back{cursor:pointer;font-size:20px;line-height:1}
+.topbar .action{cursor:pointer;font-size:20px}
+
+/* ── Bottom nav ── */
+#bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:#fff;border-top:1px solid #eee;display:none;z-index:200}
+#bottom-nav.show{display:flex}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 0 12px;cursor:pointer;color:#aaa;transition:color .2s;font-size:11px;font-weight:600;gap:3px}
+.nav-item .ni{font-size:22px;line-height:1}
+.nav-item.active{color:#e94560}
+.nav-fab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.nav-fab .fab{width:52px;height:52px;background:#e94560;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:26px;color:#fff;margin-top:-20px;box-shadow:0 4px 16px rgba(233,69,96,.4)}
+
+/* ── Section headers ── */
+.section-hd{padding:20px 20px 8px;font-size:13px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px}
+
+/* ── Room Card ── */
+.room-card{background:#fff;margin:0 16px 12px;border-radius:18px;padding:18px;box-shadow:0 2px 10px rgba(0,0,0,.06);cursor:pointer;transition:transform .15s,box-shadow .15s;border:2px solid transparent}
+.room-card:active{transform:scale(.98);box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.room-card.selected{border-color:#e94560}
+.room-card-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px}
+.room-card-title{font-size:15px;font-weight:700;color:#1a1a2e;flex:1;margin-right:8px}
+.badge{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap}
+.badge-waiting{background:#eaf4fd;color:#1a5276}
+.badge-full{background:#fef5e7;color:#b7770d}
+.badge-completed{background:#eafaf1;color:#1e8449}
+.badge-cancelled{background:#fdedec;color:#922b21}
+.room-route{display:flex;align-items:center;gap:6px;font-size:13px;color:#555;margin-bottom:8px}
+.room-route .arrow{color:#e94560;font-size:16px}
+.room-meta{display:flex;gap:12px}
+.room-meta span{font-size:12px;color:#999;display:flex;align-items:center;gap:3px}
+.empty-state{text-align:center;padding:60px 20px;color:#bbb}
+.empty-state .ei{font-size:48px;margin-bottom:12px}
+.empty-state p{font-size:15px;font-weight:600}
+.empty-state small{font-size:13px;display:block;margin-top:4px}
+
+/* ── Room Detail ── */
+.detail-hero{background:linear-gradient(135deg,#1a1a2e,#16213e);padding:24px 20px 28px;color:#fff}
+.detail-hero h2{font-size:20px;font-weight:800;margin-bottom:6px}
+.detail-route{display:flex;align-items:center;gap:8px;font-size:14px;opacity:.8}
+.detail-route .da{color:#e94560;font-size:18px}
+.detail-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:20px 20px 0}
+.info-box{background:#fff;border-radius:14px;padding:14px;box-shadow:0 1px 6px rgba(0,0,0,.05)}
+.info-box .ib-label{font-size:11px;color:#999;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
+.info-box .ib-val{font-size:16px;font-weight:800;color:#1a1a2e}
+.detail-actions{padding:16px 20px;display:flex;gap:10px}
+.detail-actions .btn{flex:1}
+
+/* ── Members ── */
+.members{padding:0 20px 16px}
+.member-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #f5f5f5}
+.member-item:last-child{border:none}
+.avatar{width:38px;height:38px;border-radius:12px;background:#e94560;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:14px;flex-shrink:0}
+.avatar.host{background:#1a1a2e}
+.member-info{flex:1}
+.member-id{font-size:14px;font-weight:700}
+.member-role{font-size:12px;color:#aaa}
+.member-paid .badge{font-size:11px}
+
+/* ── Payment ── */
+.payment-card{margin:0 20px 12px;background:#fff;border-radius:18px;padding:20px;box-shadow:0 2px 10px rgba(0,0,0,.06)}
+.pay-amount{text-align:center;padding:16px 0}
+.pay-amount .per{font-size:36px;font-weight:900;color:#e94560}
+.pay-amount .per small{font-size:16px;font-weight:600;color:#888}
+.pay-amount p{font-size:13px;color:#aaa;margin-top:4px}
+.pay-status-list{margin-top:12px}
+.pay-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f5f5f5}
+.pay-row:last-child{border:none}
+
+/* ── Profile ── */
+.profile-hero{background:linear-gradient(135deg,#1a1a2e,#16213e);padding:40px 20px 32px;text-align:center;color:#fff}
+.profile-avatar{width:72px;height:72px;background:#e94560;border-radius:22px;display:inline-flex;align-items:center;justify-content:center;font-size:28px;font-weight:900;margin-bottom:12px}
+.profile-name{font-size:22px;font-weight:800}
+.profile-id{font-size:13px;opacity:.6;margin-top:2px}
+.manner-bar{background:rgba(255,255,255,.15);border-radius:20px;height:8px;margin:16px 0 4px}
+.manner-fill{background:#e94560;height:8px;border-radius:20px;transition:width .6s ease}
+.manner-label{font-size:12px;opacity:.7;text-align:right}
+.profile-row{background:#fff;margin:0 16px 10px;border-radius:14px;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 6px rgba(0,0,0,.05)}
+.profile-row .pr-label{font-size:14px;color:#555}
+.profile-row .pr-val{font-size:14px;font-weight:700;color:#1a1a2e}
+
+/* ── Create Room form ── */
+#page-create .topbar{background:#fff}
+.create-body{padding:16px 20px}
+
+/* ── Match banner ── */
+.match-banner{margin:0 16px 12px;background:linear-gradient(135deg,#e94560,#c0392b);border-radius:18px;padding:18px;color:#fff}
+.match-banner h3{font-size:15px;font-weight:800;margin-bottom:6px}
+.match-banner p{font-size:13px;opacity:.85;margin-bottom:14px}
+
+/* ── Loader ── */
+.loader{text-align:center;padding:40px;color:#ccc;font-size:13px}
+
+/* ── Chat ── */
+#page-chatroom{display:flex;flex-direction:column;height:100vh;padding-bottom:0!important}
+/* chatroom 페이지에서 bottomNav 숨김 처리는 JS에서 */
+.chat-messages{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;background:#f4f6fb}
+.msg-wrap{display:flex;flex-direction:column}
+.msg-wrap.mine{align-items:flex-end}
+.msg-wrap.other{align-items:flex-start}
+.msg-sender{font-size:11px;color:#aaa;margin-bottom:3px;padding:0 4px}
+.msg-bubble{max-width:72%;padding:10px 14px;border-radius:18px;font-size:14px;line-height:1.55;word-break:break-word}
+.msg-wrap.mine .msg-bubble{background:#e94560;color:#fff;border-bottom-right-radius:4px}
+.msg-wrap.other .msg-bubble{background:#fff;color:#1a1a2e;border:1px solid #eee;border-bottom-left-radius:4px}
+.msg-time{font-size:10px;color:#bbb;margin-top:3px;padding:0 4px}
+.chat-input-bar{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fff;border-top:1px solid #eee;flex-shrink:0}
+.chat-input-bar input{flex:1;border:2px solid #eee;border-radius:22px;padding:10px 16px;font-size:14px;outline:none;transition:border .2s}
+.chat-input-bar input:focus{border-color:#e94560}
+.chat-send-btn{width:44px;height:44px;border-radius:50%;background:#e94560;border:none;color:#fff;font-size:22px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.chat-send-btn:active{transform:scale(.92)}
+.chat-system{text-align:center;font-size:12px;color:#bbb;padding:4px 0}
+.dm-item{background:#fff;margin:0 16px 10px;border-radius:16px;padding:16px;box-shadow:0 1px 8px rgba(0,0,0,.05);cursor:pointer;display:flex;align-items:center;gap:12px;transition:transform .15s}
+.dm-item:active{transform:scale(.98)}
+.dm-avatar{width:44px;height:44px;border-radius:14px;background:#1a1a2e;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:16px;flex-shrink:0}
+.dm-info{flex:1;min-width:0}
+.dm-name{font-size:14px;font-weight:700}
+.dm-last{font-size:12px;color:#aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ── ngrok warning ── */
+.ngrok-warn{background:#fff3cd;border:1px solid #ffc107;border-radius:12px;padding:12px 16px;margin:12px 16px;font-size:12px;color:#856404;display:none}
+
+/* ── Rating Modal ── */
+.modal-overlay{position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center}
+.modal-sheet{background:#fff;border-radius:24px 24px 0 0;padding:28px 24px 40px;width:100%;max-width:480px;animation:slideUp .3s ease}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-sheet h3{font-size:17px;font-weight:800;margin-bottom:4px}
+.modal-sub{font-size:13px;color:#aaa;margin-bottom:20px}
+.rate-item{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid #f5f5f5}
+.rate-item:last-child{border:none}
+.rate-btns{display:flex;gap:8px;margin-left:auto;flex-shrink:0}
+.rate-btn{width:46px;height:46px;border-radius:12px;border:none;font-size:22px;cursor:pointer;transition:all .15s}
+.rate-btn.good{background:#eafaf1}
+.rate-btn.bad{background:#fdedec}
+.rate-btn.rated{opacity:.45;cursor:not-allowed;transform:none!important}
+.rate-btn:active:not(.rated){transform:scale(.9)}
+
+/* ── History Page ── */
+.history-card{background:#fff;margin:0 16px 12px;border-radius:18px;padding:18px;box-shadow:0 2px 10px rgba(0,0,0,.06)}
+.history-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px}
+.history-route{font-size:15px;font-weight:700;color:#1a1a2e}
+.history-date{font-size:12px;color:#aaa;margin-top:2px}
+.history-meta{display:flex;gap:14px;font-size:12px;color:#888;margin-top:8px}
+.history-fare{font-size:20px;font-weight:900;color:#e94560;margin-top:6px}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════
+     AUTH PAGE
+══════════════════════════════════════════ -->
+<div id="page-auth" class="page">
+  <div class="auth-logo">
+    <div class="icon">T</div>
+    <h1>TaxiMate</h1>
+    <p>대학생 택시 동승 매칭 서비스</p>
+  </div>
+  <div class="auth-card">
+    <div class="auth-tabs">
+      <div class="auth-tab active" onclick="authTab('login')">로그인</div>
+      <div class="auth-tab" onclick="authTab('register')">회원가입</div>
+    </div>
+
+    <!-- Login -->
+    <div id="auth-login" class="auth-panel active">
+      <div class="field"><label>이메일</label><input id="l-email" type="email" placeholder="moonjg0305@yu.ac.kr"></div>
+      <div class="field"><label>비밀번호</label><input id="l-pw" type="password" placeholder="비밀번호"></div>
+      <button class="btn btn-red" onclick="doLogin()">로그인</button>
+    </div>
+
+    <!-- Register -->
+    <div id="auth-register" class="auth-panel">
+      <div class="field"><label>학번</label><input id="r-id" placeholder="22112052"></div>
+      <div class="field"><label>이름</label><input id="r-name" placeholder="홍길동"></div>
+      <div class="field"><label>이메일</label><input id="r-email" type="email" placeholder="xxx@yu.ac.kr"></div>
+      <div class="field"><label>비밀번호</label><input id="r-pw" type="password" placeholder="비밀번호"></div>
+      <button class="btn btn-dark" id="reg-btn" onclick="doRegister()">회원가입</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     HOME PAGE (방 목록)
+══════════════════════════════════════════ -->
+<div id="page-home" class="page">
+  <div class="topbar">
+    <div class="icon" style="width:28px;height:28px;background:#e94560;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff;font-size:13px;flex-shrink:0">T</div>
+    <h2>TaxiMate</h2>
+    <span class="action" onclick="goPage('profile')" title="프로필">👤</span>
+  </div>
+
+  <div class="ngrok-warn" id="ngrok-warn">
+    ⚠️ 외부 접속 시 ngrok 경고 페이지가 뜨면 "Visit Site" 버튼을 눌러주세요.
+  </div>
+
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 8px">
+    <span style="font-size:13px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px">동승 방 목록</span>
+    <button class="btn btn-red btn-sm" onclick="goPage('match')">⚡ 자동 매칭</button>
+  </div>
+  <div id="room-list"><div class="loader">불러오는 중...</div></div>
+  <div style="height:16px"></div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     CREATE ROOM PAGE
+══════════════════════════════════════════ -->
+<div id="page-create" class="page">
+  <div class="topbar">
+    <span class="back" onclick="goPage('home')">←</span>
+    <h2>방 만들기</h2>
+  </div>
+  <div class="create-body">
+    <div class="field"><label>방 제목</label><input id="c-title" placeholder="예) 영대 정문에서 대구은행역 가실 분"></div>
+    <div class="field"><label>출발지</label><input id="c-dep" placeholder="예) 영남대 정문"></div>
+    <div class="field"><label>목적지</label><input id="c-dest" placeholder="예) 대구은행역"></div>
+    <div class="field"><label>출발 시간</label><input id="c-time" type="time" value="21:30"></div>
+    <div class="field"><label>최대 인원</label>
+      <select id="c-max">
+        <option value="2">2명</option>
+        <option value="3">3명</option>
+        <option value="4" selected>4명</option>
+      </select>
+    </div>
+    <button class="btn btn-red" style="margin-top:8px" onclick="doCreateRoom()">방 개설하기</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     AUTO MATCH PAGE
+══════════════════════════════════════════ -->
+<div id="page-match" class="page">
+  <div class="topbar">
+    <span class="back" onclick="goPage('home')">←</span>
+    <h2>⚡ 자동 매칭</h2>
+  </div>
+  <div class="create-body">
+    <div style="background:#eaf4fd;border-radius:14px;padding:14px;margin-bottom:20px;font-size:13px;color:#1a5276;line-height:1.7">
+      목적지를 입력하면 <strong>Haversine 거리 계산</strong>으로 2km 이내 방에 자동 합류됩니다.<br>
+      맞는 방이 없으면 새 방이 자동으로 만들어집니다.
+    </div>
+    <div class="field"><label>내 출발지</label><input id="m-dep" placeholder="예) 영남대 정문"></div>
+    <div class="field"><label>목적지</label><input id="m-dest" placeholder="예) 반월당역"></div>
+    <div class="field"><label>출발 시간</label><input id="m-time" type="time" value="21:30"></div>
+    <button class="btn btn-red" style="margin-top:8px" id="match-btn" onclick="doMatch()">매칭 요청하기</button>
+    <div id="match-result" style="margin-top:16px"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     ROOM DETAIL PAGE
+══════════════════════════════════════════ -->
+<div id="page-detail" class="page">
+  <div class="topbar" style="background:transparent;border:none;position:absolute;top:0;left:0;right:0;z-index:10">
+    <span class="back" style="color:#fff;font-size:24px" onclick="goPage('home')">←</span>
+    <div style="flex:1"></div>
+  </div>
+  <div id="detail-content"></div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     PROFILE PAGE
+══════════════════════════════════════════ -->
+<div id="page-profile" class="page">
+  <div class="topbar">
+    <span class="back" onclick="goPage('home')">←</span>
+    <h2>내 프로필</h2>
+  </div>
+  <div id="profile-content"><div class="loader">불러오는 중...</div></div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     CHAT LIST PAGE
+══════════════════════════════════════════ -->
+<div id="page-chat" class="page">
+  <div class="topbar"><h2>채팅</h2></div>
+  <div class="section-hd">참여 중인 방 채팅</div>
+  <div id="chat-rooms-list"><div class="loader">불러오는 중...</div></div>
+  <div class="section-hd" style="margin-top:8px">1:1 대화</div>
+  <div id="chat-dms-list"><div class="loader">불러오는 중...</div></div>
+  <div style="height:16px"></div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     CHAT ROOM PAGE (방채팅 + DM 공용)
+══════════════════════════════════════════ -->
+<div id="page-chatroom" class="page">
+  <div class="topbar">
+    <span class="back" id="chatroom-back" onclick="goPage('chat')">←</span>
+    <h2 id="chatroom-title">채팅</h2>
+  </div>
+  <div class="chat-messages" id="chat-messages"></div>
+  <div class="chat-input-bar">
+    <input id="chat-input" placeholder="메시지를 입력하세요..." onkeydown="if(event.key==='Enter')sendChatMsg()">
+    <button class="chat-send-btn" onclick="sendChatMsg()">↑</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     HISTORY PAGE
+══════════════════════════════════════════ -->
+<div id="page-history" class="page">
+  <div class="topbar">
+    <h2>이용 내역</h2>
+  </div>
+  <div id="history-list"><div class="loader">불러오는 중...</div></div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     JOIN MODAL (목적지 입력)
+══════════════════════════════════════════ -->
+<div id="join-modal" class="modal-overlay" style="display:none">
+  <div class="modal-sheet">
+    <h3>방 참여하기</h3>
+    <div class="modal-sub">내 목적지를 입력하면 거리 비율에 따라 정산이 자동으로 나눠집니다.</div>
+    <div class="field">
+      <label>내 목적지</label>
+      <input id="join-dest" placeholder="예) 반월당역" style="border:2px solid #eee;border-radius:12px;padding:13px 16px;font-size:15px;width:100%;outline:none">
+    </div>
+    <div style="margin-top:6px;font-size:12px;color:#aaa">비워두면 방의 공통 목적지로 처리됩니다</div>
+    <div style="display:flex;gap:10px;margin-top:20px">
+      <button class="btn btn-grey" style="flex:1" onclick="document.getElementById('join-modal').style.display='none'">취소</button>
+      <button class="btn btn-red" style="flex:1" onclick="confirmJoin()">참여하기</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     RATING MODAL
+══════════════════════════════════════════ -->
+<div id="rating-modal" class="modal-overlay" style="display:none">
+  <div class="modal-sheet">
+    <h3>동승 감사해요! 🚕</h3>
+    <div class="modal-sub">함께한 분들의 매너를 평가해주세요. 서로의 온도가 바뀝니다.</div>
+    <div id="rating-list"></div>
+    <button class="btn btn-dark" style="margin-top:20px" onclick="closeRatingModal(); loadHistory()">닫기</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     BOTTOM NAV
+══════════════════════════════════════════ -->
+<nav id="bottom-nav">
+  <div class="nav-item active" id="nav-home" onclick="goPage('home')">
+    <span class="ni">🏠</span>방 목록
+  </div>
+  <div class="nav-item" id="nav-chat" onclick="goPage('chat')">
+    <span class="ni">💬</span>채팅
+  </div>
+  <div class="nav-fab" onclick="goPage('create')">
+    <div class="fab">+</div>
+  </div>
+  <div class="nav-item" id="nav-profile" onclick="goPage('profile')">
+    <span class="ni">👤</span>프로필
+  </div>
+</nav>
+
+<div id="toast"></div>
+
+<!-- ══════════════════════════════════════════
+     SCRIPT
+══════════════════════════════════════════ -->
+<script>
+const BASE = '';
+let TOKEN = localStorage.getItem('tm_token') || '';
+let ME = JSON.parse(localStorage.getItem('tm_me') || 'null');
+let currentRoomId = null;
+
+// ── Init ────────────────────────────────────────────────────────────────────
+window.onload = async () => {
+  if (TOKEN) {
+    // 토큰이 있어도 서버에서 실제 유저 존재 여부 확인
+    const r = await api('GET', '/api/users/me');
+    if (r.ok) {
+      ME = r.data;
+      localStorage.setItem('tm_me', JSON.stringify(r.data));
+      showMain(); showPage('home'); loadRooms(); connectWS();
+    } else {
+      // 유저 없음 (서버 재시작 등) → 자동 로그아웃
+      TOKEN = ''; ME = null;
+      localStorage.removeItem('tm_token');
+      localStorage.removeItem('tm_me');
+      showPage('auth');
+    }
+  }
+  else showPage('auth');
+
+  // ngrok warning check
+  if (location.hostname.includes('ngrok')) {
+    document.getElementById('ngrok-warn').style.display = 'block';
+  }
+};
+
+// ── Toast ────────────────────────────────────────────────────────────────────
+let toastTimer;
+function toast(msg, isErr = false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show' + (isErr ? ' err' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.className = '', 2800);
+}
+
+// ── Page routing ─────────────────────────────────────────────────────────────
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+}
+function showMain() {
+  document.getElementById('bottom-nav').classList.add('show');
+}
+function goPage(id) {
+  showPage(id);
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const nav = document.getElementById('nav-' + id);
+  if (nav) nav.classList.add('active');
+  if (id === 'home') loadRooms();
+  if (id === 'profile') loadProfile();
+  if (id === 'history') loadHistory();
+  if (id === 'chat') loadChatList();
+}
+
+// ── API helper ───────────────────────────────────────────────────────────────
+async function api(method, path, body) {
+  const h = {'Content-Type': 'application/json'};
+  if (TOKEN) h['Authorization'] = 'Bearer ' + TOKEN;
+  const r = await fetch(BASE + path, {
+    method,
+    headers: h,
+    body: body ? JSON.stringify(body) : undefined
+  });
+  let data;
+  try { data = await r.json(); } catch { data = null; }
+  // 서버 재시작 후 토큰 만료 → 자동 로그아웃
+  if (r.status === 401) {
+    TOKEN = ''; ME = null;
+    localStorage.removeItem('tm_token');
+    localStorage.removeItem('tm_me');
+    document.getElementById('bottom-nav').classList.remove('show');
+    showPage('auth');
+    toast('세션이 만료됐습니다. 다시 로그인해주세요', true);
+  }
+  return { ok: r.ok, status: r.status, data };
+}
+
+// ── Auth tabs ────────────────────────────────────────────────────────────────
+function authTab(tab) {
+  document.querySelectorAll('.auth-tab').forEach((t, i) => t.classList.toggle('active', ['login','register'][i] === tab));
+  document.querySelectorAll('.auth-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('auth-' + tab).classList.add('active');
+}
+
+// ── Email verify ─────────────────────────────────────────────────────────────
+async function sendCode() {
+  const email = document.getElementById('r-email').value.trim();
+  if (!email) return toast('이메일을 입력해주세요', true);
+  const r = await api('POST', '/api/auth/email', { email });
+  if (r.ok) { toast('✅ 인증코드가 발송됐습니다'); document.getElementById('code-field').style.display = 'block'; }
+  else toast('발송 실패: ' + JSON.stringify(r.data), true);
+}
+async function verifyCode() {
+  const email = document.getElementById('r-email').value.trim();
+  const code = document.getElementById('r-code').value.trim();
+  const r = await api('POST', '/api/auth/verify', { email, code });
+  if (r.ok) { toast('✅ 인증 완료!'); document.getElementById('reg-btn').disabled = false; document.getElementById('reg-btn').textContent = '회원가입'; }
+  else toast('코드가 틀렸거나 만료됐습니다', true);
+}
+
+// ── Register ──────────────────────────────────────────────────────────────────
+async function doRegister() {
+  const body = {
+    studentId: document.getElementById('r-id').value.trim(),
+    name:      document.getElementById('r-name').value.trim(),
+    email:     document.getElementById('r-email').value.trim(),
+    password:  document.getElementById('r-pw').value
+  };
+  if (!body.studentId || !body.name || !body.password) return toast('모든 항목을 입력해주세요', true);
+  const r = await api('POST', '/api/users/register', body);
+  if (r.ok) { toast('✅ 가입 완료! 로그인해주세요'); authTab('login'); document.getElementById('l-email').value = body.email; }
+  else toast('가입 실패: ' + JSON.stringify(r.data), true);
+}
+
+// ── Login ─────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const email = document.getElementById('l-email').value.trim();
+  const pw    = document.getElementById('l-pw').value;
+  if (!email || !pw) return toast('이메일과 비밀번호를 입력해주세요', true);
+  const r = await api('POST', '/api/users/login', { email, password: pw });
+  if (r.ok && r.data) {
+    const tok = r.data.token || (typeof r.data === 'string' ? r.data : null);
+    if (tok) {
+      TOKEN = tok;
+      localStorage.setItem('tm_token', tok);
+      toast('✅ 로그인됐습니다');
+      showMain();
+      showPage('home');
+      loadRooms();
+      loadProfile();
+      connectWS();
+    }
+  } else {
+    toast('로그인 실패. 이메일/비밀번호 확인해주세요', true);
+  }
+}
+
+// ── Room list ─────────────────────────────────────────────────────────────────
+async function loadRooms() {
+  const el = document.getElementById('room-list');
+  el.innerHTML = '<div class="loader">불러오는 중...</div>';
+  const r = await api('GET', '/api/rooms');
+  if (!r.ok) { el.innerHTML = '<div class="loader">로드 실패</div>'; return; }
+  const all = r.data || [];
+  // CANCELLED, SETTLED 방은 목록에서 제외
+  const rooms = all.filter(room => room.status !== 'CANCELLED' && room.status !== 'SETTLED');
+  if (rooms.length === 0) {
+    el.innerHTML = `<div class="empty-state"><div class="ei">🚕</div><p>아직 방이 없어요</p><small>아래 + 버튼으로 방을 만들어보세요</small></div>`;
+    return;
+  }
+  el.innerHTML = rooms.map(room => roomCard(room)).join('');
+}
+
+function statusBadge(s) {
+  const map = { WAITING:'badge-waiting', FULL:'badge-full', COMPLETED:'badge-completed', CANCELLED:'badge-cancelled', SETTLED:'badge-completed' };
+  const labels = { WAITING:'대기중', FULL:'만석', COMPLETED:'완료', CANCELLED:'취소', SETTLED:'정산완료' };
+  const cls = map[s] || 'badge-waiting';
+  return `<span class="badge ${cls}">${labels[s] || s}</span>`;
+}
+
+function roomCard(room) {
+  const members = (room.userIds || []).length;
+  const max = room.maxParticipants || '?';
+  return `<div class="room-card" onclick="openRoom('${room.roomId}')">
+    <div class="room-card-top">
+      <div class="room-card-title">${esc(room.title)}</div>
+      ${statusBadge(room.status)}
+    </div>
+    <div class="room-route">
+      <span>${esc(room.departure)}</span>
+      <span class="arrow">→</span>
+      <span>${esc(room.destination)}</span>
+    </div>
+    <div class="room-meta">
+      <span>🕐 ${esc(room.departureTime)}</span>
+      <span>👥 ${members}/${max}명</span>
+      <span>🔑 ${room.roomId}</span>
+    </div>
+  </div>`;
+}
+
+// ── Room detail ──────────────────────────────────────────────────────────────
+async function openRoom(roomId) {
+  currentRoomId = roomId;
+  showPage('detail');
+  const r = await api('GET', '/api/rooms/' + roomId);
+  if (!r.ok) { toast('방을 불러올 수 없습니다', true); return; }
+  renderDetail(r.data);
+}
+
+function renderDetail(room) {
+  const myId = getMyId();
+  const isHost = room.userIds && room.userIds[0] === myId;
+  const isMember = room.userIds && room.userIds.includes(myId);
+  const active = room.status === 'WAITING' || room.status === 'FULL';
+  const boarded = room.boardedUsers || [];
+  const allBoarded = room.userIds && boarded.length >= room.userIds.length && room.userIds.length > 0;
+  const myBoarded = boarded.includes(myId);
+
+  const dests = room.userDestinations || {};
+  let memberHtml = (room.userIds || []).map((uid, i) => {
+    const isUserBoarded = boarded.includes(uid);
+    const kickBtn = (isHost && uid !== myId && active)
+      ? `<button class="btn btn-sm" style="background:#fde8ec;color:#e94560;margin-left:6px" onclick="doKick('${room.roomId}','${uid}')">강퇴</button>`
+      : '';
+    return `<div class="member-item">
+      <div class="avatar ${i===0?'host':''}">${i===0?'👑':'👤'}</div>
+      <div class="member-info">
+        <div class="member-id">${esc(uid)}${isUserBoarded ? ' <span style="color:#27ae60;font-size:11px">✓탑승</span>' : ''}</div>
+        <div class="member-role" style="color:#888">
+          ${i===0?'방장 · ':'멤버 · '}
+          <span style="color:#e94560">→ ${esc(dests[uid] || room.destination || '?')}</span>
+        </div>
+      </div>
+      ${kickBtn}
+    </div>`;
+  }).join('');
+
+  let actionHtml = '';
+  if (active) {
+    if (isMember) {
+      // 탑승완료: 모든 멤버 가능
+      const boardBtn = myBoarded
+        ? `<button class="btn btn-grey btn-sm" disabled>✓ 탑승완료</button>`
+        : `<button class="btn btn-green btn-sm" onclick="doBoard('${room.roomId}')">탑승완료</button>`;
+      // 출발: 방장만, 전원 탑승 시에만 활성화
+      const departBtn = isHost
+        ? `<button class="btn btn-dark btn-sm" onclick="doDepart('${room.roomId}')" ${allBoarded?'':'disabled'} title="${allBoarded?'출발':'아직 탑승 안 한 멤버 있음'}">${allBoarded?'🚕 출발':'🚕 출발 (대기중)'}</button>`
+        : '';
+      // 방 취소: 방장만
+      const cancelBtn = isHost
+        ? `<button class="btn btn-sm" style="background:#fde8ec;color:#e94560" onclick="doCancel('${room.roomId}')">방 취소</button>`
+        : '';
+      // 탑승 카운터
+      const counter = `<div style="font-size:12px;color:#888;margin-bottom:6px;text-align:center">탑승완료: ${boarded.length} / ${(room.userIds||[]).length}명</div>`;
+      actionHtml = `<div class="detail-actions" style="flex-direction:column;gap:8px">
+        ${counter}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+          ${boardBtn}${departBtn}${cancelBtn}
+        </div>
+      </div>`;
+    } else {
+      actionHtml = `<div class="detail-actions">
+        <button class="btn btn-red" onclick="doJoin('${room.roomId}')">참여하기</button>
+      </div>`;
+    }
+  }
+
+  let payHtml = '';
+  if (room.status === 'COMPLETED' || room.status === 'SETTLED') {
+    payHtml = `<div class="section-hd">정산</div>
+    <div class="payment-card" id="pay-section">
+      <button class="btn btn-dark" onclick="loadPayment('${room.roomId}')">정산 현황 확인</button>
+      <div id="pay-detail" style="margin-top:14px"></div>
+      <div style="margin-top:12px">
+        <div class="field"><label>총 택시비 (원)</label><input id="pay-fare" type="number" placeholder="12000" style="margin-top:4px"></div>
+        <button class="btn btn-red btn-sm" onclick="doCreatePayment('${room.roomId}')">정산 시작</button>
+        <button class="btn btn-green btn-sm" style="margin-left:8px" onclick="doMarkPaid('${room.roomId}')">내 납부 처리</button>
+      </div>
+    </div>`;
+  }
+
+  document.getElementById('detail-content').innerHTML = `
+    <div class="detail-hero">
+      <div style="height:44px"></div>
+      <div style="margin-bottom:8px">${statusBadge(room.status)}</div>
+      <h2>${esc(room.title)}</h2>
+      <div class="detail-route">
+        <span>${esc(room.departure)}</span>
+        <span class="da">→</span>
+        <span>${esc(room.destination)}</span>
+      </div>
+    </div>
+    <div class="detail-info-grid">
+      <div class="info-box"><div class="ib-label">출발 시간</div><div class="ib-val">${esc(room.departureTime)}</div></div>
+      <div class="info-box"><div class="ib-label">인원</div><div class="ib-val">${(room.userIds||[]).length} / ${room.maxParticipants}명</div></div>
+      <div class="info-box"><div class="ib-label">방 ID</div><div class="ib-val" style="font-size:13px">${room.roomId}</div></div>
+      <div class="info-box"><div class="ib-label">상태</div><div class="ib-val" style="font-size:13px">${room.status}</div></div>
+    </div>
+    ${actionHtml}
+    <div style="padding:0 20px 4px;display:flex;align-items:center;justify-content:space-between">
+      <div class="section-hd" style="padding:16px 0 8px">참여자 (${(room.userIds||[]).length}명)</div>
+      ${isMember ? `<button class="btn btn-dark btn-sm" onclick="openRoomChat('${room.roomId}','${esc(room.title)}')">💬 방 채팅</button>` : ''}
+    </div>
+    <div class="members">${memberHtml}</div>
+    ${isMember ? `
+    <div style="padding:0 20px 16px">
+      <div class="section-hd" style="padding:8px 0">동승자에게 DM</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${(room.userIds||[]).filter(u=>u!==getMyId()).map(u=>
+          `<button class="btn btn-outline btn-sm" onclick="openDm('${u}')">💬 ${esc(u)}</button>`
+        ).join('')}
+      </div>
+    </div>` : ''}
+    ${payHtml}
+  `;
+}
+
+// ── Room actions ─────────────────────────────────────────────────────────────
+let _joinRoomId = null;
+
+function doJoin(roomId) {
+  _joinRoomId = roomId;
+  document.getElementById('join-dest').value = '';
+  document.getElementById('join-modal').style.display = 'flex';
+}
+
+async function confirmJoin() {
+  const dest = document.getElementById('join-dest').value.trim();
+  document.getElementById('join-modal').style.display = 'none';
+  const body = dest ? { destination: dest } : {};
+  const r = await api('POST', '/api/rooms/' + _joinRoomId + '/join', body);
+  if (r.ok) { toast('✅ 방에 참여했습니다!'); openRoom(_joinRoomId); }
+  else toast((r.data && r.data.message) || '참여 실패', true);
+}
+
+async function doBoard(roomId) {
+  const r = await api('POST', '/api/rooms/' + roomId + '/board');
+  if (r.ok) {
+    toast(`✅ 탑승완료! (${r.data.boardedCount}/${r.data.totalCount})`);
+    openRoom(roomId);
+  } else toast((r.data && r.data.message) || '오류 발생', true);
+}
+async function doDepart(roomId) {
+  if (!confirm('출발할까요? (전원 탑승 확인됐습니다)')) return;
+  const r = await api('PATCH', '/api/rooms/' + roomId + '/depart');
+  if (r.ok) { toast('🚕 출발합니다! 안전한 이동 되세요'); openRoom(roomId); }
+  else toast((r.data && r.data.message) || '오류 발생', true);
+}
+async function doKick(roomId, targetId) {
+  if (!confirm(`${targetId}님을 강퇴할까요?`)) return;
+  const r = await api('DELETE', '/api/rooms/' + roomId + '/kick/' + targetId);
+  if (r.ok) { toast(`${targetId}님이 강퇴됐습니다`); openRoom(roomId); }
+  else toast((r.data && r.data.message) || '오류 발생', true);
+}
+async function doComplete(roomId) {
+  // 구 호환용 - doDepart로 위임
+  await doDepart(roomId);
+}
+async function doCancel(roomId) {
+  if (!confirm('방을 취소할까요?')) return;
+  const r = await api('PATCH', '/api/rooms/' + roomId + '/cancel');
+  if (r.ok) { toast('방이 취소됐습니다'); openRoom(roomId); }
+  else toast((r.data && r.data.message) || '오류 발생', true);
+}
+
+// ── Create room ───────────────────────────────────────────────────────────────
+async function doCreateRoom() {
+  const body = {
+    title:           document.getElementById('c-title').value.trim(),
+    departure:       document.getElementById('c-dep').value.trim(),
+    destination:     document.getElementById('c-dest').value.trim(),
+    departureTime:   document.getElementById('c-time').value,
+    maxParticipants: parseInt(document.getElementById('c-max').value),
+    userId:          getMyId()
+  };
+  if (!body.title || !body.departure || !body.destination) return toast('제목, 출발지, 목적지를 입력해주세요', true);
+  const r = await api('POST', '/api/rooms', body);
+  if (r.ok) {
+    toast('✅ 방이 만들어졌습니다');
+    openRoom(r.data.roomId);
+  } else toast('방 생성 실패', true);
+}
+
+// ── Auto match ────────────────────────────────────────────────────────────────
+async function doMatch() {
+  const dep  = document.getElementById('m-dep').value.trim();
+  const dest = document.getElementById('m-dest').value.trim();
+  const time = document.getElementById('m-time').value;
+  if (!dep || !dest) return toast('출발지와 목적지를 입력해주세요', true);
+
+  const btn = document.getElementById('match-btn');
+  btn.disabled = true; btn.textContent = '매칭 중...';
+
+  const r = await api('POST', '/api/rooms/match', {
+    userId: getMyId(), title: dest + ' 방향 동승',
+    departure: dep, destination: dest, departureTime: time
+  });
+
+  btn.disabled = false; btn.textContent = '매칭 요청하기';
+
+  if (r.ok) {
+    const status = r.data.status;
+    const room = r.data.room;
+    const resEl = document.getElementById('match-result');
+    const isMatched = status === 'MATCHED';
+    resEl.innerHTML = `
+      <div style="background:${isMatched ? '#eafaf1' : '#eaf4fd'};border-radius:14px;padding:16px;border:2px solid ${isMatched ? '#27ae60' : '#2980b9'}">
+        <div style="font-size:15px;font-weight:800;color:${isMatched ? '#1e8449' : '#1a5276'};margin-bottom:6px">
+          ${isMatched ? '✅ 기존 방에 합류됐습니다!' : '🆕 새 방이 만들어졌습니다'}
+        </div>
+        <div style="font-size:13px;color:#555;margin-bottom:12px">${esc(room.departure)} → ${esc(room.destination)} | ${esc(room.departureTime)} | ${(room.userIds||[]).length}/${room.maxParticipants}명</div>
+        <button class="btn btn-red btn-sm" onclick="openRoom('${room.roomId}')">방으로 이동 →</button>
+      </div>`;
+  } else {
+    toast('매칭 실패: ' + JSON.stringify(r.data), true);
+  }
+}
+
+// ── Payment ───────────────────────────────────────────────────────────────────
+async function loadPayment(roomId) {
+  const r = await api('GET', '/api/payments/' + roomId);
+  const el = document.getElementById('pay-detail');
+  if (!r.ok || !r.data) { el.innerHTML = '<p style="color:#aaa;font-size:13px">정산 내역이 없습니다</p>'; return; }
+  const p = r.data;
+  const split = p.fareSplit || {};
+  const myId = getMyId();
+
+  const rows = Object.entries(p.paidStatus || {}).map(([uid, paid]) => {
+    const myFare = split[uid] || p.farePerPerson || 0;
+    const isMe = uid === myId;
+    return `<div class="pay-row">
+      <div>
+        <div style="font-size:14px;font-weight:${isMe?'800':'600'};color:${isMe?'#e94560':'#1a1a2e'}">${esc(uid)}${isMe?' (나)':''}</div>
+        <div style="font-size:13px;font-weight:700;color:#555;margin-top:2px">${myFare.toLocaleString()}원</div>
+      </div>
+      <span class="badge ${paid ? 'badge-completed' : 'badge-waiting'}">${paid ? '납부완료' : '미납'}</span>
+    </div>`;
+  }).join('');
+
+  const myFare = split[myId] || p.farePerPerson || 0;
+  el.innerHTML = `
+    <div style="background:#fff8f8;border-radius:12px;padding:14px;margin-bottom:12px;text-align:center">
+      <div style="font-size:12px;color:#aaa;font-weight:700;margin-bottom:4px">내가 낼 금액</div>
+      <div style="font-size:32px;font-weight:900;color:#e94560">${myFare.toLocaleString()}<span style="font-size:16px;color:#aaa">원</span></div>
+      <div style="font-size:12px;color:#bbb;margin-top:4px">총 ${(p.totalFare||0).toLocaleString()}원 · 거리 비율 자동 정산</div>
+    </div>
+    <div class="pay-status-list">${rows}</div>`;
+}
+
+async function doCreatePayment(roomId) {
+  const fare = parseInt(document.getElementById('pay-fare').value);
+  if (!fare) return toast('택시비를 입력해주세요', true);
+  const r = await api('POST', '/api/payments/' + roomId, { totalFare: fare });
+  if (r.ok) { toast('✅ 정산 시작됐습니다'); loadPayment(roomId); }
+  else toast((r.data && r.data.message) || '오류', true);
+}
+
+async function doMarkPaid(roomId) {
+  const r = await api('PATCH', '/api/payments/' + roomId + '/pay');
+  if (!r.ok) { toast((r.data && r.data.message) || '오류', true); return; }
+
+  if (r.data.allPaid) {
+    toast('✅ 전원 정산 완료! 이용내역에서 평가할 수 있어요 🎉');
+    // 잠깐 후 홈으로 → 방이 SETTLED 처리되어 목록에서 사라짐
+    setTimeout(() => goPage('home'), 1800);
+  } else {
+    toast('✅ 납부 처리됐습니다');
+    loadPayment(roomId);
+  }
+}
+
+// ── Rating Modal ──────────────────────────────────────────────────────────────
+// tm_rated: { roomId: ['uid1','uid2'], ... }  ← 이미 평가한 사람 기록 (localStorage)
+
+function getRatedMap() {
+  return JSON.parse(localStorage.getItem('tm_rated') || '{}');
+}
+function markRated(roomId, targetId) {
+  const m = getRatedMap();
+  if (!m[roomId]) m[roomId] = [];
+  if (!m[roomId].includes(targetId)) m[roomId].push(targetId);
+  localStorage.setItem('tm_rated', JSON.stringify(m));
+}
+function hasRated(roomId, targetId) {
+  const m = getRatedMap();
+  return !!(m[roomId] && m[roomId].includes(targetId));
+}
+
+function showRatingModal(members, roomId) {
+  const myId = getMyId();
+  const others = (members || []).filter(m => m !== myId);
+
+  if (others.length === 0) {
+    toast('평가할 동승자가 없어요');
+    return;
+  }
+
+  const listHtml = others.map(uid => {
+    const already = hasRated(roomId, uid);
+    return `<div class="rate-item" id="ri-${uid}">
+      <div class="avatar" style="background:${already?'#ccc':'#e94560'}">${esc((uid||'?')[0])}</div>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:700">${esc(uid)}</div>
+        <div style="font-size:12px;color:#aaa">${already ? '평가 완료' : '동승자'}</div>
+      </div>
+      <div class="rate-btns">
+        <button class="rate-btn good${already?' rated':''}" title="좋아요 +0.5°C"
+          onclick="${already?'':` doRateUser('${roomId}','${uid}', 0.5)`}">👍</button>
+        <button class="rate-btn bad${already?' rated':''}" title="별로예요 -0.3°C"
+          onclick="${already?'':` doRateUser('${roomId}','${uid}', -0.3)`}">👎</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('rating-list').innerHTML = listHtml;
+  document.getElementById('rating-modal').setAttribute('data-room', roomId);
+  document.getElementById('rating-modal').style.display = 'flex';
+}
+
+async function doRateUser(roomId, targetId, score) {
+  if (hasRated(roomId, targetId)) return;
+  markRated(roomId, targetId);
+
+  // UI 즉시 비활성화
+  const ri = document.getElementById('ri-' + targetId);
+  if (ri) {
+    ri.querySelectorAll('.rate-btn').forEach(b => b.classList.add('rated'));
+    const roleEl = ri.querySelector('div > div:last-child');
+    if (roleEl) roleEl.textContent = '평가 완료';
+  }
+
+  const r = await api('POST', '/api/users/' + targetId + '/rate', { score });
+  if (r.ok) {
+    toast(score > 0 ? `👍 ${targetId}님께 좋아요!` : `👎 ${targetId}님 별로예요`);
+  }
+}
+
+function closeRatingModal() {
+  document.getElementById('rating-modal').style.display = 'none';
+}
+
+// ── History (이용내역) ─────────────────────────────────────────────────────────
+async function loadHistory() {
+  const el = document.getElementById('history-list');
+  el.innerHTML = '<div class="loader">불러오는 중...</div>';
+
+  const r = await api('GET', '/api/rooms/history');
+  if (!r.ok) { el.innerHTML = '<div class="loader">불러오기 실패</div>'; return; }
+
+  const list = (r.data || []).slice().reverse(); // 최신 순
+  if (list.length === 0) {
+    el.innerHTML = `<div class="empty-state"><div class="ei">🕐</div><p>아직 이용 내역이 없어요</p><small>정산까지 완료하면 여기에 기록돼요</small></div>`;
+    return;
+  }
+
+  el.innerHTML = list.map(room => {
+    const myId = getMyId();
+    const others = (room.userIds || []).filter(u => u !== myId);
+    const allRated = others.every(u => hasRated(room.roomId, u));
+    const ratedCount = others.filter(u => hasRated(room.roomId, u)).length;
+
+    return `<div class="history-card" onclick="openHistoryDetail('${room.roomId}', ${JSON.stringify(room.userIds).replace(/"/g,'&quot;')})">
+      <div class="history-top">
+        <div>
+          <div class="history-route">${esc(room.departure)} → ${esc(room.destination)}</div>
+          <div style="font-size:12px;color:#aaa;margin-top:3px">출발 ${esc(room.departureTime)}</div>
+        </div>
+        ${allRated
+          ? `<span class="badge badge-completed">평가완료</span>`
+          : `<span class="badge" style="background:#fff3cd;color:#856404">평가 ${ratedCount}/${others.length}</span>`}
+      </div>
+      <div class="history-meta">
+        <span>👥 ${(room.userIds||[]).length}명</span>
+        <span>🔑 ${room.roomId}</span>
+      </div>
+      ${!allRated ? `<div style="margin-top:12px"><button class="btn btn-red btn-sm" onclick="event.stopPropagation();openHistoryDetail('${room.roomId}', ${JSON.stringify(room.userIds).replace(/"/g,'&quot;')})">동승자 평가하기 →</button></div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function openHistoryDetail(roomId, members) {
+  showRatingModal(members, roomId);
+}
+
+// ── Profile ───────────────────────────────────────────────────────────────────
+async function loadProfile() {
+  const r = await api('GET', '/api/users/me');
+  if (!r.ok) return;
+  const u = r.data;
+  ME = u;
+  localStorage.setItem('tm_me', JSON.stringify(u));
+  const temp = u.mannerTemperature || 36.5;
+  const pct = Math.min(100, Math.max(0, ((temp - 30) / 40) * 100));
+  document.getElementById('profile-content').innerHTML = `
+    <div class="profile-hero">
+      <div class="profile-avatar">${(u.name||'?')[0]}</div>
+      <div class="profile-name">${esc(u.name)}</div>
+      <div class="profile-id">${esc(u.studentId)} · ${esc(u.email)}</div>
+      <div class="manner-bar"><div class="manner-fill" style="width:${pct}%"></div></div>
+      <div class="manner-label">매너온도 ${temp.toFixed(1)}°C</div>
+    </div>
+    <div style="height:16px"></div>
+    <div class="profile-row"><span class="pr-label">학번</span><span class="pr-val">${esc(u.studentId)}</span></div>
+    <div class="profile-row"><span class="pr-label">이름</span><span class="pr-val">${esc(u.name)}</span></div>
+    <div class="profile-row"><span class="pr-label">이메일</span><span class="pr-val">${esc(u.email)}</span></div>
+    <div class="profile-row"><span class="pr-label">매너온도</span><span class="pr-val" style="color:#e94560">${temp.toFixed(1)}°C 🌡️</span></div>
+    <div style="padding:0 16px;margin-top:16px;display:flex;flex-direction:column;gap:10px">
+      <button class="btn btn-grey" onclick="goPage('history')">🕐 이용내역 보기</button>
+      <button class="btn btn-grey" onclick="doLogout()">로그아웃</button>
+    </div>
+  `;
+}
+
+async function doManner() {
+  const score = parseFloat(document.getElementById('manner-score').value);
+  const r = await api('PATCH', '/api/users/manner', { score });
+  if (r.ok) { toast('✅ 매너온도가 갱신됐습니다'); loadProfile(); }
+  else toast('갱신 실패', true);
+}
+
+// ══════════════════════════════════════════════════════
+//  WebSocket / STOMP 채팅
+// ══════════════════════════════════════════════════════
+let stompClient = null;
+let chatSubscription = null;   // 현재 구독 채널
+let currentChatId = null;      // 현재 열린 chatId
+let currentChatIsRoom = false; // true=방채팅, false=DM
+
+function connectWS(callback) {
+  if (stompClient && stompClient.connected) { if (callback) callback(); return; }
+  const socket = new SockJS('/ws');
+  stompClient = Stomp.over(socket);
+  stompClient.debug = () => {};  // 콘솔 노이즈 제거
+  stompClient.connect({}, () => { if (callback) callback(); }, () => {
+    setTimeout(() => connectWS(callback), 3000);
+  });
+}
+
+function enterChatroom() {
+  // 채팅방 진입 시 하단 네비 숨김 → 입력창이 가려지지 않도록
+  const nav = document.getElementById('bottom-nav');
+  if (nav) nav.classList.remove('show');
+}
+function exitChatroom() {
+  // 채팅방 퇴장 시 하단 네비 복원
+  const nav = document.getElementById('bottom-nav');
+  if (nav) nav.classList.add('show');
+}
+
+// 방 채팅 열기
+function openRoomChat(roomId, title) {
+  currentChatId = roomId;
+  currentChatIsRoom = true;
+  document.getElementById('chatroom-title').textContent = title || '방 채팅';
+  document.getElementById('chatroom-back').onclick = () => { exitChatroom(); openRoom(roomId); };
+  enterChatroom();
+  showPage('chatroom');
+  loadChatHistory('ROOM', roomId);
+  connectWS(() => subscribeChatChannel('/sub/chat/room/' + roomId));
+}
+
+// DM 열기
+async function openDm(targetId) {
+  const r = await api('GET', '/api/chat/dm-id/' + targetId);
+  if (!r.ok) return;
+  const chatId = r.data.chatId;
+  currentChatId = chatId;
+  currentChatIsRoom = false;
+  document.getElementById('chatroom-title').textContent = '💬 ' + targetId;
+  document.getElementById('chatroom-back').onclick = () => { exitChatroom(); goPage('chat'); };
+  enterChatroom();
+  showPage('chatroom');
+  loadChatHistory('DM', chatId);
+  connectWS(() => subscribeChatChannel('/sub/chat/dm/' + chatId));
+}
+
+function subscribeChatChannel(channel) {
+  if (chatSubscription) { try { chatSubscription.unsubscribe(); } catch(e){} }
+  chatSubscription = stompClient.subscribe(channel, frame => {
+    const msg = JSON.parse(frame.body);
+    appendMessage(msg);
+  });
+}
+
+function sendChatMsg() {
+  const input = document.getElementById('chat-input');
+  const content = input.value.trim();
+  if (!content || !currentChatId || !stompClient || !stompClient.connected) return;
+
+  const dest = currentChatIsRoom
+    ? '/pub/chat/room/' + currentChatId
+    : '/pub/chat/dm/'   + currentChatId;
+
+  stompClient.send(dest, {}, JSON.stringify({
+    senderId: getMyId(),
+    content: content
+  }));
+  input.value = '';
+}
+
+async function loadChatHistory(type, chatId) {
+  const el = document.getElementById('chat-messages');
+  el.innerHTML = '<div class="chat-system">불러오는 중...</div>';
+  const path = type === 'ROOM' ? '/api/chat/room/' + chatId : '/api/chat/dm/' + chatId;
+  const r = await api('GET', path);
+  el.innerHTML = '';
+  if (r.ok && r.data && r.data.length > 0) {
+    r.data.forEach(msg => appendMessage(msg, false));
+  } else {
+    el.innerHTML = '<div class="chat-system">첫 메시지를 보내보세요 👋</div>';
+  }
+  el.scrollTop = el.scrollHeight;
+}
+
+function appendMessage(msg, scroll = true) {
+  const el = document.getElementById('chat-messages');
+  const myId = getMyId();
+  const isMine = msg.senderId === myId;
+  const time = msg.sentAt ? new Date(msg.sentAt).toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'}) : '';
+
+  // 빈 "첫 메시지" 안내 제거
+  const placeholder = el.querySelector('.chat-system');
+  if (placeholder) placeholder.remove();
+
+  const wrap = document.createElement('div');
+  wrap.className = 'msg-wrap ' + (isMine ? 'mine' : 'other');
+  wrap.innerHTML = `
+    ${!isMine ? `<div class="msg-sender">${esc(msg.senderName || msg.senderId)}</div>` : ''}
+    <div class="msg-bubble">${esc(msg.content)}</div>
+    <div class="msg-time">${time}</div>`;
+  el.appendChild(wrap);
+  if (scroll) el.scrollTop = el.scrollHeight;
+}
+
+// 채팅 목록 페이지 로드
+async function loadChatList() {
+  // 참여 중인 방 채팅 목록
+  const roomEl = document.getElementById('chat-rooms-list');
+  const r = await api('GET', '/api/rooms');
+  if (r.ok && r.data) {
+    const myRooms = r.data.filter(rm =>
+      rm.userIds && rm.userIds.includes(getMyId()) &&
+      rm.status !== 'CANCELLED' && rm.status !== 'SETTLED'
+    );
+    if (myRooms.length === 0) {
+      roomEl.innerHTML = '<div style="padding:8px 20px;font-size:13px;color:#bbb">참여 중인 방이 없어요</div>';
+    } else {
+      roomEl.innerHTML = myRooms.map(rm => `
+        <div class="dm-item" onclick="openRoomChat('${rm.roomId}', '${esc(rm.title)}')">
+          <div class="dm-avatar" style="background:#e94560;font-size:18px">🚕</div>
+          <div class="dm-info">
+            <div class="dm-name">${esc(rm.title)}</div>
+            <div class="dm-last">${esc(rm.departure)} → ${esc(rm.destination)} · ${(rm.userIds||[]).length}명</div>
+          </div>
+        </div>`).join('');
+    }
+  }
+
+  // DM 목록
+  const dmEl = document.getElementById('chat-dms-list');
+  const d = await api('GET', '/api/chat/dms');
+  if (d.ok && d.data && d.data.length > 0) {
+    dmEl.innerHTML = d.data.map(dm => `
+      <div class="dm-item" onclick="openDm('${esc(dm.otherId)}')">
+        <div class="dm-avatar">${esc((dm.otherName||dm.otherId)[0])}</div>
+        <div class="dm-info">
+          <div class="dm-name">${esc(dm.otherName || dm.otherId)}</div>
+          <div class="dm-last">${esc(dm.lastMessage || '대화를 시작하세요')}</div>
+        </div>
+      </div>`).join('');
+  } else {
+    dmEl.innerHTML = '<div style="padding:8px 20px;font-size:13px;color:#bbb">아직 1:1 대화가 없어요</div>';
+  }
+}
+
+function doLogout() {
+  if (stompClient) { try { stompClient.disconnect(); } catch(e){} stompClient = null; }
+  TOKEN = ''; ME = null;
+  localStorage.removeItem('tm_token');
+  localStorage.removeItem('tm_me');
+  document.getElementById('bottom-nav').classList.remove('show');
+  showPage('auth');
+  toast('로그아웃됐습니다');
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function getMyId() {
+  if (ME) return ME.studentId;
+  if (TOKEN) {
+    try { return JSON.parse(atob(TOKEN.split('.')[1])).sub; } catch {}
+  }
+  return '';
+}
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>

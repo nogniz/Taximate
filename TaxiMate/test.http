@@ -1,7 +1,72 @@
-### 1. 동승 방 개설 테스트 (POST 요청)
-# 💡 localhost 대신 127.0.0.1 로 명시적 수정
+### ========================================
+### [STEP 1] 이메일 인증 발송 (인증번호 요청)
+### ========================================
+POST http://127.0.0.1:8080/api/auth/email
+Content-Type: application/json
+
+{
+  "email": "moonjg0305@yu.ac.kr"
+}
+
+### ========================================
+### [STEP 2] 인증번호 검증 (메일로 받은 6자리 입력)
+### ========================================
+POST http://127.0.0.1:8080/api/auth/verify
+Content-Type: application/json
+
+{
+  "email": "moonjg0305@yu.ac.kr",
+  "code": "736107"
+}
+
+### ========================================
+### [STEP 3] 회원가입 (인증 완료 후 즉시 가입)
+### ========================================
+POST http://127.0.0.1:8080/api/users/register
+Content-Type: application/json
+
+{
+  "studentId": "22112052",
+  "name": "문진곤",
+  "email": "moonjg0305@yu.ac.kr",
+  "password": "mypassword123"
+}
+
+### ========================================
+### [STEP 4] 로그인 → JWT 토큰 발급
+### ========================================
+POST http://127.0.0.1:8080/api/users/login
+Content-Type: application/json
+
+{
+  "email": "moonjg0305@yu.ac.kr",
+  "password": "mypassword123"
+}
+
+### ========================================
+### [STEP 5] 내 프로필 조회 (JWT 토큰 필요)
+### ========================================
+# 💡 로그인 응답에서 받은 token 값을 아래 Bearer 뒤에 붙여넣으세요
+GET http://127.0.0.1:8080/api/users/me
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyMjExMjA1MiIsImlhdCI6MTc4MTEwNzE3MiwiZXhwIjoxNzgxMTkzNTcyfQ.QKn9FfMvGcrJ7P9CzJSQ7uTwDRKFqIczCZl_e0m0xEE
+
+### ========================================
+### [STEP 6] 매너 온도 갱신 (JWT 토큰 필요)
+### ========================================
+PATCH http://127.0.0.1:8080/api/users/manner
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyMjExMjA1MiIsImlhdCI6MTc4MTEwNzE3MiwiZXhwIjoxNzgxMTkzNTcyfQ.QKn9FfMvGcrJ7P9CzJSQ7uTwDRKFqIczCZl_e0m0xEE
+
+{
+  "score": 0.5
+}
+
+### ========================================
+### [STEP 7] 동승 방 개설 (JWT 토큰 필요)
+### ========================================
 POST http://127.0.0.1:8080/api/rooms
 Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyMjExMjA1MiIsImlhdCI6MTc4MTEwNzE3MiwiZXhwIjoxNzgxMTkzNTcyfQ.QKn9FfMvGcrJ7P9CzJSQ7uTwDRKFqIczCZl_e0m0xEE
 
 {
   "title": "영대 정문에서 대구은행역 가실 분",
@@ -12,12 +77,15 @@ Content-Type: application/json
   "userId": "22112052"
 }
 
-### 2. 자동 매칭 테스트 (매칭 성공 시나리오)
-# 먼저 1번 방 개설(목적지: 대구은행역)이 살아있는 상태에서 실행해야 합니다.
+### ========================================
+### [STEP 8] 자동 매칭 테스트 (매칭 성공 시나리오)
+### ========================================
+# 먼저 STEP 7 방 개설이 살아있는 상태에서 실행해야 합니다.
 # 목적지를 "반월당역"으로 다르게 보냈지만, 대구은행역과 직선거리가 약 1.4km라
-# 우리 알고리즘 식에 의해 유사도가 약 81%로 계산되어 기존 방에 자동으로 합류(MATCHED)되어야 합니다.
+# 유사도가 약 81%로 계산되어 기존 방에 자동으로 합류(MATCHED)되어야 합니다.
 POST http://127.0.0.1:8080/api/rooms/match
 Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyMjExMjA1MiIsImlhdCI6MTc4MTEwNzE3MiwiZXhwIjoxNzgxMTkzNTcyfQ.QKn9FfMvGcrJ7P9CzJSQ7uTwDRKFqIczCZl_e0m0xEE
 
 {
   "userId": "22119999",
@@ -26,3 +94,40 @@ Content-Type: application/json
   "destination": "반월당역",
   "departureTime": "21:30"
 }
+
+### ========================================
+### [STEP 9] 탑승 완료 처리 (WAITING/FULL → COMPLETED)
+### ========================================
+# roomId는 STEP 7 응답에서 받은 값으로 교체하세요
+PATCH http://127.0.0.1:8080/api/rooms/77f28106/complete
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyMjExMjA1MiIsImlhdCI6MTc4MTEwNzE3MiwiZXhwIjoxNzgxMTkzNTcyfQ.QKn9FfMvGcrJ7P9CzJSQ7uTwDRKFqIczCZl_e0m0xEE
+
+### ========================================
+### [STEP 10] 방 취소 (방장만 가능, WAITING/FULL → CANCELLED)
+### ========================================
+# roomId는 새로 개설한 방의 값으로 교체하세요
+PATCH http://127.0.0.1:8080/api/rooms/77f28106/cancel
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyMjExMjA1MiIsImlhdCI6MTc4MTEwNzE3MiwiZXhwIjoxNzgxMTkzNTcyfQ.QKn9FfMvGcrJ7P9CzJSQ7uTwDRKFqIczCZl_e0m0xEE
+
+### ========================================
+### [STEP 11] 정산 시작 (COMPLETED 상태 방에서만 가능)
+### ========================================
+POST http://127.0.0.1:8080/api/payments/77f28106
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyMjExMjA1MiIsImlhdCI6MTc4MTEwNzE3MiwiZXhwIjoxNzgxMTkzNTcyfQ.QKn9FfMvGcrJ7P9CzJSQ7uTwDRKFqIczCZl_e0m0xEE
+
+{
+  "totalFare": 12000
+}
+
+### ========================================
+### [STEP 12] 내 납부 처리 (JWT 토큰 필요)
+### ========================================
+PATCH http://127.0.0.1:8080/api/payments/77f28106/pay
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyMjExMjA1MiIsImlhdCI6MTc4MTEwNzE3MiwiZXhwIjoxNzgxMTkzNTcyfQ.QKn9FfMvGcrJ7P9CzJSQ7uTwDRKFqIczCZl_e0m0xEE
+
+### ========================================
+### [STEP 13] 정산 현황 조회
+### ========================================
+GET http://127.0.0.1:8080/api/payments/77f28106
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyMjExMjA1MiIsImlhdCI6MTc4MTEwNzE3MiwiZXhwIjoxNzgxMTkzNTcyfQ.QKn9FfMvGcrJ7P9CzJSQ7uTwDRKFqIczCZl_e0m0xEE
