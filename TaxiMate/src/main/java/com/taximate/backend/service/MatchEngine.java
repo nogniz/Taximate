@@ -26,34 +26,49 @@ public class MatchEngine {
     private final Map<String, double[]> coordCache = new ConcurrentHashMap<>();
 
     // 대구 주요 지점 하드코딩 좌표 (Kakao API 실패 시 폴백)
-    private static final Map<String, double[]> DAEGU_COORDS = Map.ofEntries(
-        Map.entry("영대정문",       new double[]{35.8384, 128.7527}),
-        Map.entry("영남대학교",     new double[]{35.8384, 128.7527}),
-        Map.entry("영남대",         new double[]{35.8384, 128.7527}),
-        Map.entry("영대병원역",     new double[]{35.8428, 128.7528}),
-        Map.entry("대구은행역",     new double[]{35.8694, 128.5981}),
-        Map.entry("반월당역",       new double[]{35.8657, 128.5938}),  // 대구은행역보다 서쪽 → 영남대에서 더 멀리
-        Map.entry("반월당",         new double[]{35.8657, 128.5938}),
-        Map.entry("동대구역",       new double[]{35.8798, 128.6283}),
-        Map.entry("대구역",         new double[]{35.8795, 128.5889}),
-        Map.entry("범어역",         new double[]{35.8618, 128.6284}),
-        Map.entry("수성구청역",     new double[]{35.8574, 128.6335}),
-        Map.entry("황금역",         new double[]{35.8561, 128.6192}),
-        Map.entry("대공원역",       new double[]{35.8409, 128.6361}),
-        Map.entry("고산역",         new double[]{35.8366, 128.6611}),
-        Map.entry("신매역",         new double[]{35.8379, 128.6481}),
-        Map.entry("사월역",         new double[]{35.8350, 128.6757}),
-        Map.entry("임당역",         new double[]{35.8355, 128.6878}),
-        Map.entry("경산역",         new double[]{35.8274, 128.7395}),
-        Map.entry("서문시장",       new double[]{35.8687, 128.5841}),
-        Map.entry("칠성시장",       new double[]{35.8841, 128.5973}),
-        Map.entry("동성로",         new double[]{35.8703, 128.5968}),
-        Map.entry("두류공원",       new double[]{35.8564, 128.5716}),
-        Map.entry("북부정류장",     new double[]{35.8895, 128.5875}),
-        Map.entry("서부정류장",     new double[]{35.8708, 128.5600}),
-        Map.entry("남부정류장",     new double[]{35.8408, 128.5967}),
-        Map.entry("대구공항",       new double[]{35.8970, 128.6589})
-    );
+    // ※ 경대병원역(1호선, 중구 도심) vs 칠곡경대병원역(3호선, 북구)을 명확히 구분
+    //   Kakao API는 "경대병원역" 검색 시 종종 칠곡(3호선) 결과를 먼저 반환해 거리가 크게 틀림
+    private static final Map<String, double[]> DAEGU_COORDS;
+    static {
+        Map<String, double[]> m = new java.util.HashMap<>();
+        m.put("영대정문",                 new double[]{35.8384, 128.7527});
+        m.put("영남대학교",               new double[]{35.8384, 128.7527});
+        m.put("영남대",                   new double[]{35.8384, 128.7527});
+        m.put("영대병원역",               new double[]{35.8428, 128.7528});
+        // 1호선 도심 역들
+        m.put("대구은행역",               new double[]{35.8694, 128.5981});
+        m.put("반월당역",                 new double[]{35.8657, 128.5938}); // 대구은행역보다 서쪽
+        m.put("반월당",                   new double[]{35.8657, 128.5938});
+        // 경북대병원역(1호선) ← "경대병원역" 검색 의도는 여기
+        m.put("경대병원역",               new double[]{35.8706, 128.5957});
+        m.put("경북대병원역",             new double[]{35.8706, 128.5957});
+        m.put("경북대학교병원역",         new double[]{35.8706, 128.5957});
+        // 칠곡경대병원역(3호선) - 북구 칠곡, 전혀 다른 위치
+        m.put("칠곡경대병원역",           new double[]{35.9411, 128.5651});
+        m.put("칠곡경북대병원역",         new double[]{35.9411, 128.5651});
+        m.put("칠곡경북대학교병원역",     new double[]{35.9411, 128.5651});
+        // 기타 주요 역/지점
+        m.put("동대구역",                 new double[]{35.8798, 128.6283});
+        m.put("대구역",                   new double[]{35.8795, 128.5889});
+        m.put("범어역",                   new double[]{35.8618, 128.6284});
+        m.put("수성구청역",               new double[]{35.8574, 128.6335});
+        m.put("황금역",                   new double[]{35.8561, 128.6192});
+        m.put("대공원역",                 new double[]{35.8409, 128.6361});
+        m.put("고산역",                   new double[]{35.8366, 128.6611});
+        m.put("신매역",                   new double[]{35.8379, 128.6481});
+        m.put("사월역",                   new double[]{35.8350, 128.6757});
+        m.put("임당역",                   new double[]{35.8355, 128.6878});
+        m.put("경산역",                   new double[]{35.8274, 128.7395});
+        m.put("서문시장",                 new double[]{35.8687, 128.5841});
+        m.put("칠성시장",                 new double[]{35.8841, 128.5973});
+        m.put("동성로",                   new double[]{35.8703, 128.5968});
+        m.put("두류공원",                 new double[]{35.8564, 128.5716});
+        m.put("북부정류장",               new double[]{35.8895, 128.5875});
+        m.put("서부정류장",               new double[]{35.8708, 128.5600});
+        m.put("남부정류장",               new double[]{35.8408, 128.5967});
+        m.put("대구공항",                 new double[]{35.8970, 128.6589});
+        DAEGU_COORDS = java.util.Collections.unmodifiableMap(m);
+    }
 
     // 1. 하버사인 공식 거리 계산
     public double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
