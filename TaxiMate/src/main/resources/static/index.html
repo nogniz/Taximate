@@ -8,7 +8,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{font-family:'Segoe UI',Apple SD Gothic Neo,sans-serif;background:#f4f6fb;color:#1a1a2e;min-height:100vh;max-width:480px;margin:0 auto;position:relative}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Segoe UI',Apple SD Gothic Neo,sans-serif;background:#f4f6fb;color:#1a1a2e;height:100%;max-width:480px;margin:0 auto;position:relative}
+.page{overflow-y:auto}
 
 /* ── Toast ── */
 #toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:12px 24px;border-radius:24px;font-size:13px;font-weight:600;opacity:0;transition:opacity .3s;z-index:9999;pointer-events:none;white-space:nowrap}
@@ -16,7 +18,7 @@ body{font-family:'Segoe UI',Apple SD Gothic Neo,sans-serif;background:#f4f6fb;co
 #toast.err{background:#e94560}
 
 /* ── Pages ── */
-.page{display:none;min-height:100vh;padding-bottom:80px}
+.page{display:none;height:100%;padding-bottom:80px;overflow-y:auto}
 .page.active{display:block}
 
 /* ── Auth Page ── */
