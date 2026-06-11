@@ -5,7 +5,7 @@
     "buildCommand": "./gradlew bootJar -x test"
   },
   "deploy": {
-    "startCommand": "java -jar build/libs/TaxiMate-0.0.1-SNAPSHOT.jar",
+    "startCommand": "java -jar $(ls build/libs/*.jar | grep -v plain | head -1)",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   }
