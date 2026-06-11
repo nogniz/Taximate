@@ -31,9 +31,9 @@ public class MatchEngine {
         Map.entry("영남대학교",     new double[]{35.8384, 128.7527}),
         Map.entry("영남대",         new double[]{35.8384, 128.7527}),
         Map.entry("영대병원역",     new double[]{35.8428, 128.7528}),
-        Map.entry("대구은행역",     new double[]{35.8703, 128.5977}),
-        Map.entry("반월당역",       new double[]{35.8674, 128.6007}),
-        Map.entry("반월당",         new double[]{35.8674, 128.6007}),
+        Map.entry("대구은행역",     new double[]{35.8694, 128.5981}),
+        Map.entry("반월당역",       new double[]{35.8657, 128.5938}),  // 대구은행역보다 서쪽 → 영남대에서 더 멀리
+        Map.entry("반월당",         new double[]{35.8657, 128.5938}),
         Map.entry("동대구역",       new double[]{35.8798, 128.6283}),
         Map.entry("대구역",         new double[]{35.8795, 128.5889}),
         Map.entry("범어역",         new double[]{35.8618, 128.6284}),
@@ -140,11 +140,16 @@ public class MatchEngine {
         return similarity;
     }
 
-    // 4-0. 출발시간 문자열 → 분(int) 변환 (HH:mm 형식, 파싱 실패 시 -1)
+    // 4-0. 출발시간 문자열 → 분(int) 변환
+    // 지원 형식: "HH:mm" / "2026-06-11T14:30" (datetime-local)
     private int parseMinutes(String timeStr) {
         if (timeStr == null || timeStr.isBlank()) return -1;
         try {
-            String[] parts = timeStr.trim().split(":");
+            // datetime-local 형식: "2026-06-11T14:30" → 시간 부분만 추출
+            String timePart = timeStr.contains("T")
+                    ? timeStr.split("T")[1]
+                    : timeStr.trim();
+            String[] parts = timePart.split(":");
             if (parts.length < 2) return -1;
             return Integer.parseInt(parts[0]) * 60 + Integer.parseInt(parts[1]);
         } catch (NumberFormatException e) {
