@@ -978,21 +978,34 @@ async function loadHistory() {
     const allRated = others.every(u => hasRated(room.roomId, u));
     const ratedCount = others.filter(u => hasRated(room.roomId, u)).length;
 
-    return `<div class="history-card" onclick="openHistoryDetail('${room.roomId}', ${JSON.stringify(room.userIds).replace(/"/g,'&quot;')})">
-      <div class="history-top">
-        <div>
-          <div class="history-route">${esc(room.departure)} → ${esc(room.destination)}</div>
-          <div style="font-size:12px;color:#aaa;margin-top:3px">출발 ${fmtTime(room.departureTime)}</div>
+    // 동승자 DM 버튼 (각 동승자마다 1:1 채팅 버튼)
+    const dmButtons = others.length > 0
+      ? `<div style="margin-top:12px;border-top:1px solid #f0f0f0;padding-top:10px">
+           <div style="font-size:11px;color:#aaa;margin-bottom:6px">동승자에게 1:1 채팅</div>
+           <div style="display:flex;flex-wrap:wrap;gap:6px">
+             ${others.map(u => `<button class="btn btn-outline btn-sm" style="font-size:11px;padding:5px 10px" onclick="event.stopPropagation();openDm('${esc(u)}')">💬 ${esc(u)}</button>`).join('')}
+           </div>
+         </div>`
+      : '';
+
+    return `<div class="history-card">
+      <div style="cursor:pointer" onclick="openHistoryDetail('${room.roomId}', ${JSON.stringify(room.userIds).replace(/"/g,'&quot;')})">
+        <div class="history-top">
+          <div>
+            <div class="history-route">${esc(room.departure)} → ${esc(room.destination)}</div>
+            <div style="font-size:12px;color:#aaa;margin-top:3px">출발 ${fmtTime(room.departureTime)}</div>
+          </div>
+          ${allRated
+            ? `<span class="badge badge-completed">평가완료</span>`
+            : `<span class="badge" style="background:#fff3cd;color:#856404">평가 ${ratedCount}/${others.length}</span>`}
         </div>
-        ${allRated
-          ? `<span class="badge badge-completed">평가완료</span>`
-          : `<span class="badge" style="background:#fff3cd;color:#856404">평가 ${ratedCount}/${others.length}</span>`}
+        <div class="history-meta">
+          <span>👥 ${(room.userIds||[]).length}명</span>
+          <span>🔑 ${room.roomId}</span>
+        </div>
+        ${!allRated ? `<div style="margin-top:10px"><button class="btn btn-red btn-sm" onclick="event.stopPropagation();openHistoryDetail('${room.roomId}', ${JSON.stringify(room.userIds).replace(/"/g,'&quot;')})">동승자 평가하기 →</button></div>` : ''}
       </div>
-      <div class="history-meta">
-        <span>👥 ${(room.userIds||[]).length}명</span>
-        <span>🔑 ${room.roomId}</span>
-      </div>
-      ${!allRated ? `<div style="margin-top:12px"><button class="btn btn-red btn-sm" onclick="event.stopPropagation();openHistoryDetail('${room.roomId}', ${JSON.stringify(room.userIds).replace(/"/g,'&quot;')})">동승자 평가하기 →</button></div>` : ''}
+      ${dmButtons}
     </div>`;
   }).join('');
 }
