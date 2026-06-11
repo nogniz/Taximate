@@ -269,7 +269,7 @@ body{font-family:'Segoe UI',Apple SD Gothic Neo,sans-serif;background:#f4f6fb;co
     <div class="field"><label>방 제목</label><input id="c-title" placeholder="예) 영대 정문에서 대구은행역 가실 분"></div>
     <div class="field"><label>출발지</label><input id="c-dep" placeholder="예) 영남대 정문"></div>
     <div class="field"><label>목적지</label><input id="c-dest" placeholder="예) 대구은행역"></div>
-    <div class="field"><label>출발 일시</label><input id="c-time" type="datetime-local"></div>
+    <div class="field"><label>출발 일시</label><input id="c-time" type="datetime-local" onchange="guardPastTime(this)"></div>
     <div class="field"><label>최대 인원</label>
       <select id="c-max">
         <option value="2">2명</option>
@@ -296,7 +296,7 @@ body{font-family:'Segoe UI',Apple SD Gothic Neo,sans-serif;background:#f4f6fb;co
     </div>
     <div class="field"><label>내 출발지</label><input id="m-dep" placeholder="예) 영남대 정문"></div>
     <div class="field"><label>목적지</label><input id="m-dest" placeholder="예) 반월당역"></div>
-    <div class="field"><label>출발 일시</label><input id="m-time" type="datetime-local"></div>
+    <div class="field"><label>출발 일시</label><input id="m-time" type="datetime-local" onchange="guardPastTime(this)"></div>
     <button class="btn btn-red" style="margin-top:8px" id="match-btn" onclick="doMatch()">매칭 요청하기</button>
     <div id="match-result" style="margin-top:16px"></div>
   </div>
@@ -777,11 +777,15 @@ async function doCancel(roomId) {
 
 // ── Create room ───────────────────────────────────────────────────────────────
 async function doCreateRoom() {
+  const timeVal = document.getElementById('c-time').value;
+  if (!timeVal || timeVal < nowForInput()) {
+    return toast('⚠️ 현재 시각 이전으로는 방을 만들 수 없어요', true);
+  }
   const body = {
     title:           document.getElementById('c-title').value.trim(),
     departure:       document.getElementById('c-dep').value.trim(),
     destination:     document.getElementById('c-dest').value.trim(),
-    departureTime:   document.getElementById('c-time').value,
+    departureTime:   timeVal,
     maxParticipants: parseInt(document.getElementById('c-max').value),
     userId:          getMyId()
   };
@@ -799,6 +803,9 @@ async function doMatch() {
   const dest = document.getElementById('m-dest').value.trim();
   const time = document.getElementById('m-time').value;
   if (!dep || !dest) return toast('출발지와 목적지를 입력해주세요', true);
+  if (!time || time < nowForInput()) {
+    return toast('⚠️ 현재 시각 이후로 출발 시간을 설정해주세요', true);
+  }
 
   const btn = document.getElementById('match-btn');
   btn.disabled = true; btn.textContent = '매칭 중...';
@@ -1225,6 +1232,17 @@ function nowForInput() {
   const d = new Date();
   d.setSeconds(0, 0);
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+
+// 과거 시간 선택 방지: 날짜를 바꾼 후 시간이 과거가 되면 현재 시각으로 강제 리셋
+function guardPastTime(el) {
+  const now = nowForInput();
+  if (el.value && el.value < now) {
+    el.value = now;
+    toast('⚠️ 현재 시각 이전은 선택할 수 없어요', true);
+  }
+  // min도 항상 최신으로 갱신
+  el.min = now;
 }
 </script>
 </body>
