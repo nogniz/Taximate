@@ -28,3 +28,48 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+### Gradle ###
+build/
+.gradle/
+*.class
+
+### Spring Boot ###
+*.jar
+*.war
+
+### IDE ###
+.idea/
+*.iml
+
+### Gradle build outputs ###
+build/
+.gradle/
+*.class
+*.jar
+*.war
+
+### IntelliJ IDEA project files ###
+.idea/
+*.iml
+
+### Gradle ###
+build/
+.gradle/
+*.class
+*.jar
+*.war
+
+### IntelliJ ###
+.idea/
+*.iml
+
+### Gradle ###
+build/
+.gradle/
+*.class
+*.jar
+*.war
+
+### IntelliJ ###
+.idea/
+*.iml
