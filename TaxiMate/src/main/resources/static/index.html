@@ -1238,7 +1238,7 @@ function appendMessage(msg, scroll = true) {
   const el = document.getElementById('chat-messages');
   const myId = getMyId();
   const isMine = msg.senderId === myId;
-  const time = msg.sentAt ? new Date(msg.sentAt).toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'}) : '';
+  const time = msg.sentAt ? new Date(msg.sentAt + 'Z').toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'}) : '';
 
   // 빈 "첫 메시지" 안내 제거
   const placeholder = el.querySelector('.chat-system');
