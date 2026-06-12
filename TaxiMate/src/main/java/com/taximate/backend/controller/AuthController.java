@@ -25,7 +25,8 @@ public class AuthController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("status", "ERROR", "message", e.getMessage()));
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of("status", "ERROR", "message", "메일 발송 중 서버 에러가 발생했습니다."));
+            // 디버그: 실제 에러 메시지 반환 (배포 후 확인 후 제거 예정)
+            return ResponseEntity.internalServerError().body(Map.of("status", "ERROR", "message", e.getClass().getSimpleName() + ": " + e.getMessage()));
         }
     }
 
