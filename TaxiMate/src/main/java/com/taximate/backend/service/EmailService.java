@@ -14,8 +14,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class EmailService {
 
-    @Value("${resend.api.key}")
-    private String resendApiKey;
+    @Value("${brevo.api.key}")
+    private String brevoApiKey;
 
     private final RestTemplate restTemplate = new RestTemplate();
 
@@ -41,23 +41,30 @@ public class EmailService {
         // 메모리에 적재
         authCodeMap.put(email, new String[]{authCode, String.valueOf(expireAt)});
 
-        // Resend API 호출 (HTTPS REST - Railway SMTP 차단 우회)
+        // Brevo Transactional Email API (HTTPS REST - Railway SMTP 차단 우회, 누구에게나 발송 가능)
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(resendApiKey);
+        headers.set("api-key", brevoApiKey);
         headers.setContentType(MediaType.APPLICATION_JSON);
 
+        Map<String, Object> sender = new HashMap<>();
+        sender.put("email", "rjsrns0203@gmail.com");
+        sender.put("name", "TaxiMate");
+
+        Map<String, Object> recipient = new HashMap<>();
+        recipient.put("email", email);
+
         Map<String, Object> body = new HashMap<>();
-        body.put("from", "TaxiMate <onboarding@resend.dev>");
-        body.put("to", List.of(email));
+        body.put("sender", sender);
+        body.put("to", List.of(recipient));
         body.put("subject", "[TaxiMate] 영남대학교 학생 인증 번호입니다.");
-        body.put("text",
+        body.put("textContent",
                 "안녕하세요, TaxiMate입니다.\n\n" +
                 "본인 확인을 위한 인증 번호는 다음과 같습니다:\n" +
                 "👉 [" + authCode + "]\n\n" +
                 "인증 번호의 유효 시간은 3분입니다. 감사합니다.");
 
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
-        restTemplate.postForObject("https://api.resend.com/emails", request, String.class);
+        restTemplate.postForObject("https://api.brevo.com/v3/smtp/email", request, String.class);
     }
 
     // 2. 유저가 입력한 인증 번호 검증
