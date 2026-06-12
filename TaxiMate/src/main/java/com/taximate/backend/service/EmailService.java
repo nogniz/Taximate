@@ -17,6 +17,8 @@ public class EmailService {
     @Value("${brevo.api.key}")
     private String brevoApiKey;
 
+    private static final String LOCAL_FALLBACK_CODE = "123456"; // 로컬 환경 폴백 코드
+
     private final RestTemplate restTemplate = new RestTemplate();
 
     // 메모리에 인증번호와 만료시간(Epoch Milli)을 함께 저장하는 맵
@@ -34,12 +36,18 @@ public class EmailService {
             throw new IllegalArgumentException("영남대학교 포털 이메일(@yu.ac.kr)만 사용 가능합니다.");
         }
 
-        // 6자리 난수 생성
-        String authCode = String.valueOf(new Random().nextInt(899999) + 100000);
+        // API 키가 없으면 로컬 환경으로 판단 → 고정 코드 123456 사용
+        boolean isLocal = "placeholder".equals(brevoApiKey);
+
+        String authCode = isLocal ? LOCAL_FALLBACK_CODE
+                : String.valueOf(new Random().nextInt(899999) + 100000);
         long expireAt = System.currentTimeMillis() + AUTH_CODE_EXPIRATION_TIME;
 
         // 메모리에 적재
         authCodeMap.put(email, new String[]{authCode, String.valueOf(expireAt)});
+
+        // 로컬 환경이면 이메일 발송 생략
+        if (isLocal) return;
 
         // Brevo Transactional Email API (HTTPS REST - Railway SMTP 차단 우회, 누구에게나 발송 가능)
         HttpHeaders headers = new HttpHeaders();

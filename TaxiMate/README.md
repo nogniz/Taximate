@@ -69,4 +69,5 @@ cd TaxiMate
 # http://localhost:8080
 ```
 
-> 로컬 실행 시 이메일 발송은 BREVO_API_KEY 환경변수 필요
+> 로컬 실행 시 `BREVO_API_KEY` 환경변수가 없으면 이메일 발송 없이 **인증코드 `123456` 고정**으로 동작합니다.  
+> 실제 이메일 발송이 필요하면 IntelliJ → Run/Debug Configurations → Environment variables에 `BREVO_API_KEY` 추가
