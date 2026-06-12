@@ -23,31 +23,14 @@ public class EmailService {
     // 인증 완료된 이메일 목록 (회원가입 허가 여부 확인용, 가입 완료 시 소멸)
     private final Map<String, Boolean> verifiedEmails = new ConcurrentHashMap<>();
 
-    // 1. 6자리 인증 번호 생성 및 발송
+    // 1. 6자리 인증 번호 생성 및 발송 (시연용: 고정 코드 123456)
     public void sendVerificationEmail(String email) {
-        // 영남대 이메일 형식 정규식 체크 (@yu.ac.kr로 끝나는지 확인)
-        if (!email.endsWith("@yu.ac.kr")) {
-            throw new IllegalArgumentException("영남대학교 포털 이메일(@yu.ac.kr)만 사용 가능합니다.");
-        }
-
-        // 6자리 난수 생성
-        String authCode = String.valueOf(new Random().nextInt(899999) + 100000);
+        // 시연용 고정 인증코드
+        String authCode = "123456";
         long expireAt = System.currentTimeMillis() + AUTH_CODE_EXPIRATION_TIME;
 
         // 메모리에 적재
         authCodeMap.put(email, new String[]{authCode, String.valueOf(expireAt)});
-
-        // 메일 패킷 조립
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(email);
-        message.setSubject("[TaxiMate] 영남대학교 학생 인증 번호입니다.");
-        message.setText("안녕하세요, TaxiMate입니다.\n\n" +
-                "본인 확인을 위한 인증 번호는 다음과 같습니다:\n" +
-                "👉 [" + authCode + "]\n\n" +
-                "인증 번호의 유효 시간은 3분입니다. 감사합니다.");
-
-        // 실제 메일 서버 발송 트리거
-        mailSender.send(message);
     }
 
     // 2. 유저가 입력한 인증 번호 검증

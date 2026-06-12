@@ -246,9 +246,9 @@ body{font-family:'Segoe UI',Apple SD Gothic Neo,sans-serif;background:#f4f6fb;co
         <button class="btn btn-outline" style="width:100%;margin-top:6px" onclick="sendEmail()">인증코드 발송</button>
       </div>
       <div class="field" id="code-field" style="display:none">
-        <label>인증코드</label>
+        <label>인증코드 <span style="font-size:11px;color:#e74c3c;font-weight:normal">(시연용 고정코드: 123456)</span></label>
         <div style="display:flex;gap:8px">
-          <input id="r-code" placeholder="6자리 코드 입력" style="flex:1">
+          <input id="r-code" placeholder="123456" style="flex:1">
           <button class="btn btn-outline" style="white-space:nowrap;padding:0 12px" onclick="verifyCode()">확인</button>
         </div>
       </div>
