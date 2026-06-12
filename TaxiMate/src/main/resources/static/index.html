@@ -242,10 +242,8 @@ body{font-family:'Segoe UI',Apple SD Gothic Neo,sans-serif;background:#f4f6fb;co
       <div class="field"><label>학번</label><input id="r-id" placeholder="22112052"></div>
       <div class="field"><label>이름</label><input id="r-name" placeholder="홍길동"></div>
       <div class="field"><label>이메일</label>
-        <div style="display:flex;gap:8px">
-          <input id="r-email" type="email" placeholder="xxx@yu.ac.kr" style="flex:1">
-          <button class="btn btn-outline" style="white-space:nowrap;padding:0 12px" onclick="sendEmail()">인증코드 발송</button>
-        </div>
+        <input id="r-email" type="email" placeholder="xxx@yu.ac.kr">
+        <button class="btn btn-outline" style="width:100%;margin-top:6px" onclick="sendEmail()">인증코드 발송</button>
       </div>
       <div class="field" id="code-field" style="display:none">
         <label>인증코드</label>
