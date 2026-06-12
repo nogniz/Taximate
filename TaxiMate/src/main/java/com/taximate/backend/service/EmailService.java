@@ -1,19 +1,23 @@
 package com.taximate.backend.service;
 
-import lombok.RequiredArgsConstructor;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
-@RequiredArgsConstructor
 public class EmailService {
 
-    private final JavaMailSender mailSender;
+    @Value("${resend.api.key}")
+    private String resendApiKey;
+
+    private final RestTemplate restTemplate = new RestTemplate();
 
     // 메모리에 인증번호와 만료시간(Epoch Milli)을 함께 저장하는 맵
     // Key: 이메일주소, Value: [인증번호, 만료시간]
@@ -25,7 +29,7 @@ public class EmailService {
 
     // 1. 6자리 인증 번호 생성 및 발송
     public void sendVerificationEmail(String email) {
-        // 영남대 이메일 형식 정규식 체크 (@yu.ac.kr로 끝나는지 확인)
+        // 영남대 이메일 형식 체크
         if (!email.endsWith("@yu.ac.kr")) {
             throw new IllegalArgumentException("영남대학교 포털 이메일(@yu.ac.kr)만 사용 가능합니다.");
         }
@@ -37,17 +41,23 @@ public class EmailService {
         // 메모리에 적재
         authCodeMap.put(email, new String[]{authCode, String.valueOf(expireAt)});
 
-        // 메일 패킷 조립
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(email);
-        message.setSubject("[TaxiMate] 영남대학교 학생 인증 번호입니다.");
-        message.setText("안녕하세요, TaxiMate입니다.\n\n" +
+        // Resend API 호출 (HTTPS REST - Railway SMTP 차단 우회)
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(resendApiKey);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("from", "TaxiMate <onboarding@resend.dev>");
+        body.put("to", List.of(email));
+        body.put("subject", "[TaxiMate] 영남대학교 학생 인증 번호입니다.");
+        body.put("text",
+                "안녕하세요, TaxiMate입니다.\n\n" +
                 "본인 확인을 위한 인증 번호는 다음과 같습니다:\n" +
                 "👉 [" + authCode + "]\n\n" +
                 "인증 번호의 유효 시간은 3분입니다. 감사합니다.");
 
-        // 실제 메일 서버 발송 트리거
-        mailSender.send(message);
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+        restTemplate.postForObject("https://api.resend.com/emails", request, String.class);
     }
 
     // 2. 유저가 입력한 인증 번호 검증
